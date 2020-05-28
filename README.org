@@ -4,4 +4,8 @@ This package provides visual alignment for Org tables on GUI Emacs. It can prope
 
 To use this package, load it and run =M-x valign-setup RET=. And any Org tables in Org mode should be automatically aligned. If you want to align a table manually, run =M-x valign-table RET= on a Org table.
 
-[[./table.png]]
+You can choose from the two styles by customizing ~valign-separator-row-style~.
+
+[[./table-multi.png]]
+[[./table-single.png]]
+

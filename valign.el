@@ -14,6 +14,10 @@
 ;; To use this package, load it and run M-x valign-setup RET. And any
 ;; Org tables in Org mode should be automatically aligned. If you want
 ;; to align a table manually, run M-x valign-table RET on a Org table.
+;;
+;; Valign provides two styles of separator, |-----|-----|, and
+;; |           |. Customize ‘valign-separator-row-style’ to set a
+;; style.
 
 ;;; Code:
 ;;
@@ -228,7 +232,7 @@ Supposed to be called from jit-lock."
   (cons 'jit-lock-bounds (cons beg end)))
 
 (defun valign--align-separator-row (total-width)
-  "Align the separator row (|---+---|).
+  "Align the separator row (|---+---|) as “|        |”.
 Assumes the point is after the left bar (“|”). TOTAL-WIDTH is the
 pixel width counting from the left of the left bar to the left of
 the right bar."
@@ -248,7 +252,35 @@ the right bar."
         (overlay-put ov 'face '(:strike-through t))
         (overlay-put ov 'valign t)))))
 
+(defun valign--separator-row-add-overlay (beg end right-pos)
+  "Add overlay to a separator row’s “cell”.
+Cell ranges from BEG to END, the pixel position RIGHT-POS marks
+the position for the right bar (“|”)."
+  ;; Make “+” look like “|”
+  (when (eq (char-after end) ?+)
+    (put-text-property end (1+ end) 'display "|"))
+  (valign--put-text-property beg end right-pos)
+  ;; Why do we have to add an overlay? Because text property
+  ;; doens’t work. First, font-lock overwrites what ever face
+  ;; property you add; second, even if you are sneaky and added a
+  ;; font-lock-face property, it is overwritten by the face
+  ;; property (org-table, in this case).
+  (dolist (ov (overlays-in beg end))
+    (if (overlay-get ov 'valign)
+        (delete-overlay ov)))
+  (let ((ov (make-overlay beg end)))
+    (overlay-put ov 'face '(:strike-through t))
+    (overlay-put ov 'valign t)))
+
 ;;; Userland
+
+(defcustom valign-separator-row-style 'multi-col
+  "The style of the separator row of a table.
+Valign can render it as “|          |”
+or as “|-----|-----|”. Set this option to 'single-column
+for the former, and 'multi-column for the latter."
+  :type 'symbol
+  :group 'valign)
 
 (defun valign-table ()
   "Visually align the table at point."
@@ -256,7 +288,11 @@ the right bar."
   (condition-case err
       (save-excursion
         (let (end column-width-list column-idx pos ssw bar-width
-                  separator-row-point separator-row-end-pos)
+                  separator-row-point rev-list)
+          ;; ‘separator-row-point’ marks the point for separator-row,
+          ;; so we can later come back to it and align it.
+          ;; ‘rev-list’ is the reverse list of right positions of each
+          ;; separator row cell.
           (if (not (valign--end-of-table))
               (user-error "Not on a table"))
           (setq end (point))
@@ -283,7 +319,8 @@ the right bar."
                     ;; Initialize some numbers.
                     (if (eq column-idx 0)
                         (setq pos (valign--pixel-width-from-to
-                                   (line-beginning-position) (point))))
+                                   (line-beginning-position) (point))
+                              rev-list nil))
                     ;; Align an empty cell.
                     (if (eq cell-width 0)
                         (progn
@@ -309,11 +346,26 @@ the right bar."
                                  tab-start (point)
                                  (+ pos tab-width)))))
                     (setq pos (+ pos col-width bar-width ssw))
-                    (setq separator-row-end-pos (- pos bar-width)))))))
+                    (push (- pos bar-width) rev-list))))))
           ;; After aligning all rows, align the separator row.
           (when separator-row-point
             (goto-char separator-row-point)
-            (valign--align-separator-row separator-row-end-pos))))
+            (pcase valign-separator-row-style
+              ('single-column
+               (valign--align-separator-row (car rev-list)))
+              ('multi-column
+               (let ((p (point))
+                     (col-idx 0))
+                 (while (search-forward "+" nil t)
+                   (valign--separator-row-add-overlay
+                    p (1- (point)) (or (nth col-idx (reverse rev-list)) 0))
+                   (cl-incf col-idx)
+                   (setq p (point)))
+                 ;; Last column
+                 (when (search-forward "|" nil t)
+                   (valign--separator-row-add-overlay
+                    p (1- (point))
+                    (or (nth col-idx (reverse rev-list)) 0)))))))))
     
     (valign-bad-cell (message (error-message-string err)))
     (valign-werid-alignment (message (error-message-string err)))))
