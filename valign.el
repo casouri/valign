@@ -32,15 +32,14 @@ Return 'left if aligned left, 'right if aligned right.
 Assumes point is after the left bar (“|”).
 Doesn’t check if we are in a cell."
   (save-excursion
-    (let ((p (point)))
-      (if (looking-at " [^ ]")
-          'left
-        (if (not (search-forward "|" nil t))
-            (signal 'valign-bad-cell nil)
-          (if (looking-back
-               "[^ ] |" (max (- (point) 3) (point-min)))
-              'right
-            (signal 'valign-werid-alignment nil)))))))
+    (if (looking-at " [^ ]")
+        'left
+      (if (not (search-forward "|" nil t))
+          (signal 'valign-bad-cell nil)
+        (if (looking-back
+             "[^ ] |" (max (- (point) 3) (point-min)))
+            'right
+          (signal 'valign-werid-alignment nil))))))
 
 ;; (if (string-match (rx (seq (* " ")
 ;;                            ;; e.g., “5.”, “5.4”
