@@ -221,17 +221,33 @@ white space stretching to XPOS, a pixel x position."
 
 (defun valign--clean-text-property (beg end)
   "Clean up the display text property between BEG and END."
-  (save-excursion
-    (let (match)
-      (goto-char beg)
-      (while (and (setq match (text-property-search-forward
-                               'display nil (lambda (_ p)
-                                              (and (consp p)
-                                                   (eq (car p) 'space)))))
-                  (< (point) end))
-        (put-text-property (prop-match-beginning match)
-                           (prop-match-end match)
-                           'display nil)))))
+  ;; TODO ‘text-property-search-forward’ is Emacs 27 feature.
+  (if (boundp 'text-property-search-forward)
+      (save-excursion
+        (let (match)
+          (goto-char beg)
+          (while (and (setq match
+                            (text-property-search-forward
+                             'display nil (lambda (_ p)
+                                            (and (consp p)
+                                                 (eq (car p) 'space)))))
+                      (< (point) end))
+            (put-text-property (prop-match-beginning match)
+                               (prop-match-end match)
+                               'display nil))))
+    (let (display tab-end (p beg) last-p)
+      (while (not (eq p last-p))
+        (setq last-p p
+              p (next-single-char-property-change p 'display nil end))
+        (when (and (setq display
+                         (plist-get (text-properties-at p) 'display))
+                   (consp display)
+                   (eq (car display) 'space))
+          ;; We are at the beginning of a tab, now find the end.
+          (setq tab-end (next-single-char-property-change
+                         p'display nil end))
+          ;; Remove text property.
+          (put-text-property p tab-end 'display nil))))))
 
 (defun valign-initial-alignment (beg end)
   "Perform initial alignment for tables between BEG and END.
