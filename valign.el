@@ -410,14 +410,14 @@ for the former, and 'multi-column for the latter."
               ('multi-column
                (let ((p (point))
                      (col-idx 0))
-                 (while (search-forward "+" end t)
+                 (while (search-forward "+" (line-end-position) t)
                    (valign--separator-row-add-overlay
                     p (1- (point))
                     (or (nth col-idx (reverse rev-list)) 0))
                    (cl-incf col-idx)
                    (setq p (point)))
                  ;; Last column
-                 (when (search-forward "|" end t)
+                 (when (search-forward "|" (line-end-position) t)
                    (valign--separator-row-add-overlay
                     p (1- (point))
                     (or (nth col-idx (reverse rev-list)) 0)))))))))
