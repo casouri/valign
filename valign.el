@@ -303,12 +303,12 @@ for the former, and 'multi-column for the latter."
   (condition-case err
       (save-excursion
         (let (end column-width-list column-idx pos ssw bar-width
-                  separator-row-point rev-list right-point)
-          ;; ‘separator-row-point’ marks the point for separator-row,
-          ;; so we can later come back to it and align it. ‘rev-list’
-          ;; is the reverse list of right positions of each separator
-          ;; row cell. ‘right-point’ marks point before the right bar
-          ;; for each cell.
+                  separator-row-point-list rev-list right-point)
+          ;; ‘separator-row-point-list’ marks the point for each
+          ;; separator-row, so we can later come back and align them.
+          ;; ‘rev-list’ is the reverse list of right positions of each
+          ;; separator row cell. ‘right-point’ marks point before the
+          ;; right bar for each cell.
           (if (not (valign--end-of-table))
               (user-error "Not on a table"))
           (setq end (point))
@@ -320,7 +320,7 @@ for the former, and 'multi-column for the latter."
             ;; We don’t align the separator row yet, but will come
             ;; back to it.
             (if (valign--sperator-p)
-                (setq separator-row-point (point))
+                (push (point) separator-row-point-list)
               (save-excursion
                 ;; Check there is a right bar.
                 (when (save-excursion
@@ -386,8 +386,8 @@ for the former, and 'multi-column for the latter."
                     (setq pos (+ pos col-width bar-width ssw))
                     (push (- pos bar-width) rev-list))))))
           ;; After aligning all rows, align the separator row.
-          (when separator-row-point
-            (goto-char separator-row-point)
+          (dolist (row-point separator-row-point-list)
+            (goto-char row-point)
             (pcase valign-separator-row-style
               ('single-column
                (valign--align-separator-row (car rev-list)))
