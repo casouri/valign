@@ -312,8 +312,9 @@ the right bar."
                     (setq pos (+ pos col-width bar-width ssw))
                     (setq separator-row-end-pos (- pos bar-width)))))))
           ;; After aligning all rows, align the separator row.
-          (goto-char separator-row-point)
-          (valign--align-separator-row separator-row-end-pos)))
+          (when separator-row-point
+            (goto-char separator-row-point)
+            (valign--align-separator-row separator-row-end-pos))))
     
     (valign-bad-cell (message (error-message-string err)))
     (valign-werid-alignment (message (error-message-string err)))))
