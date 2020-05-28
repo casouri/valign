@@ -69,7 +69,7 @@ Return nil if not in a cell."
         ;; We are at the right “|”
         (backward-char)
         (valign--skip-space-backward)
-        (valign--glyph-width-from-to start (point))))))
+        (valign--pixel-width-from-to start (point))))))
 
 (defun valign--glyph-width-at-point (&optional point)
   "Return the pixel width of the glyph at POINT.
