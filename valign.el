@@ -23,6 +23,7 @@
 ;;
 
 (require 'cl-lib)
+(require 'pcase)
 
 ;;; Backstage
 
@@ -274,7 +275,7 @@ the position for the right bar (“|”)."
 
 ;;; Userland
 
-(defcustom valign-separator-row-style 'multi-col
+(defcustom valign-separator-row-style 'multi-column
   "The style of the separator row of a table.
 Valign can render it as “|          |”
 or as “|-----|-----|”. Set this option to 'single-column
@@ -356,13 +357,13 @@ for the former, and 'multi-column for the latter."
               ('multi-column
                (let ((p (point))
                      (col-idx 0))
-                 (while (search-forward "+" nil t)
+                 (while (search-forward "+" end t)
                    (valign--separator-row-add-overlay
                     p (1- (point)) (or (nth col-idx (reverse rev-list)) 0))
                    (cl-incf col-idx)
                    (setq p (point)))
                  ;; Last column
-                 (when (search-forward "|" nil t)
+                 (when (search-forward "|" end t)
                    (valign--separator-row-add-overlay
                     p (1- (point))
                     (or (nth col-idx (reverse rev-list)) 0)))))))))
