@@ -225,9 +225,9 @@ white space stretching to XPOS, a pixel x position."
     (let (match)
       (goto-char beg)
       (while (and (setq match (text-property-search-forward
-                               'display nil (lambda (p _)
+                               'display nil (lambda (_ p)
                                               (and (consp p)
-                                                   (eq (car p) 'image)))))
+                                                   (eq (car p) 'space)))))
                   (< (point) end))
         (put-text-property (prop-match-beginning match)
                            (prop-match-end match)
