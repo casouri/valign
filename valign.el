@@ -19,6 +19,10 @@
 ;; Org tables in Org mode should be automatically aligned.  If you want
 ;; to align a table manually, run M-x valign-table RET on a Org table.
 ;;
+;; In Emacs 27 and later, turning on ~valign-mode~ automatically aligns
+;; existing org tables; in Emacs 26, you need to re-open them for table
+;; alignment to take effect.
+;;
 ;; Valign provides two styles of separator, |-----|-----|, and
 ;; |           |.  Customize ‘valign-separator-row-style’ to set a
 ;; style.
