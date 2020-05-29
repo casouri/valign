@@ -471,7 +471,7 @@ for the former, and 'multi-column for the latter."
   (valign-initial-alignment beg end t))
 
 (define-minor-mode valign-mode
-  "valign minor mode."
+  "Visually align Org tables."
   :global t
   :require 'valign
   :group 'valign
