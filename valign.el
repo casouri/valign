@@ -470,6 +470,33 @@ for the former, and 'multi-column for the latter."
   "Valign hook, realign table between BEG and END."
   (valign-initial-alignment beg end t))
 
+(defun valign-window-buffer-change-hook (frame)
+  "Makes sure all visible buffers in FRAME are aligned."
+  (dolist (window (window-list frame 'no-minibuf))
+    (with-current-buffer (window-buffer window)
+      (when (and (derived-mode-p 'org-mode)
+                 valign-mode
+                 (text-property-any (point-min) (point-max)
+                                    'valign-init nil))
+        (valign-initial-alignment (point-min) (point-max))))))
+
+(defun valign-reset-buffer ()
+  "Remove alignment in the buffer."
+  ;; TODO Use the new Emacs 27 function.
+  ;; Remove text properties
+  (with-silent-modifications
+    (let ((p (point-min)) (pp (point-min)) display)
+      (while (< p (point-max))
+        (setq display (plist-get (text-properties-at p) 'display))
+        (setq p (next-single-char-property-change p 'display))
+        (when (and (consp display)
+                   (eq (car display) 'space))
+          (put-text-property pp p 'display nil))))
+    ;; Remove overlays.
+    (dolist (ov (overlays-in (point-min) (point-max)))
+      (when (overlay-get ov 'valign)
+        (delete-overlay ov)))))
+
 (define-minor-mode valign-mode
   "Visually align Org tables."
   :global t
@@ -478,7 +505,10 @@ for the former, and 'multi-column for the latter."
   :lighter valign-lighter
   (if (and valign-mode window-system)
       (progn
-        (add-hook 'org-mode-hook #'valign--org-mode-hook)
+        (if (boundp 'window-buffer-change-functions)
+            (add-hook 'window-buffer-change-functions
+                      #'valign-window-buffer-change-hook)
+          (add-hook 'org-mode-hook #'valign--org-mode-hook))
         (add-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
         (advice-add 'org-toggle-inline-images
                     :after #'valign--force-align-buffer)
@@ -487,15 +517,23 @@ for the former, and 'multi-column for the latter."
         (advice-add 'visible-mode :after #'valign--force-align-buffer)
         (advice-add 'org-table-next-field :after #'valign-table)
         (advice-add 'org-table-previous-field :after #'valign-table)
-        (advice-add 'org-flag-region :after #'valign--org-flag-region-advice))
-    (remove-hook 'org-mode-hook #'valign--org-mode-hook)
+        (advice-add 'org-flag-region :after #'valign--org-flag-region-advice)
+        (valign-initial-alignment (point-min) (point-max)))
+    (if (boundp 'window-buffer-change-functions)
+        (remove-hook 'window-buffer-change-functions
+                     #'valign-window-buffer-change-hook)
+      (remove-hook 'org-mode-hook #'valign--org-mode-hook))
     (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
     (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
     (advice-remove 'org-restart-font-lock #'valign--force-align-buffer)
     (advice-remove 'visible-mode #'valign--force-align-buffer)
     (advice-remove 'org-table-next-field #'valign-table)
     (advice-remove 'org-table-previous-field #'valign-table)
-    (advice-remove 'org-flag-region #'valign--org-flag-region-advice)))
+    (advice-remove 'org-flag-region #'valign--org-flag-region-advice)
+    (dolist (buf (buffer-list))
+      (with-current-buffer buf
+        (when (derived-mode-p 'org-mode)
+          (valign-reset-buffer))))))
 
 (provide 'valign)
 
