@@ -97,12 +97,23 @@ calculate images pixel width."
       (while (< (point) to)
         (let ((display (plist-get (text-properties-at (point))
                                   'display)))
-          ;; This is an image, add image width.
-          (if (and (consp display) (eq (car display) 'image))
-              (progn (setq width (+ width (car (image-size display t))))
-                     (goto-char
-                      (next-single-property-change (point) 'display)))
-            ;; This is a normal character, add glyph width.
+          ;; 1) This is an overlay or text property image, add image
+          ;; width.
+          (if (and (setq ;; Overlay image?
+                    display (or (cl-loop for ov in (overlays-at (point) t)
+                                         if (overlay-get ov 'display)
+                                         return (overlay-get ov 'display)
+                                         finally return nil)
+                                ;; Text property image?
+                                (plist-get (text-properties-at (point))
+                                           'display)))
+                   (consp display)
+                   (eq (car display) 'image))
+              (progn
+                (setq width (+ width (car (image-size display t))))
+                (goto-char
+                 (next-single-property-change (point) 'display)))
+            ;; 2) This is a normal character, add glyph width.
             (setq width (+ width (valign--glyph-width-at-point)))
             (forward-char)))))
     width))
