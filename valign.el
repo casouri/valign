@@ -454,8 +454,8 @@ for the former, and 'multi-column for the latter."
   "Valign hook function used by `org-mode'."
   (add-hook 'jit-lock-functions #'valign-initial-alignment 90 t))
 
-(defun valign--org-agenda-finalize-hook ()
-  "Valign hook function used by `org-agenda-finalize-hook'."
+(defun valign--force-align-buffer (&rest _)
+  "Forcefully realign every table in the buffer."
   (valign-initial-alignment (point-min) (point-max) t))
 
 (define-minor-mode valign-mode
@@ -467,11 +467,19 @@ for the former, and 'multi-column for the latter."
   (if (and valign-mode window-system)
       (progn
         (add-hook 'org-mode-hook #'valign--org-mode-hook)
-        (add-hook 'org-agenda-finalize-hook #'valign--org-agenda-finalize-hook)
+        (add-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
+        (advice-add 'org-toggle-inline-images
+                    :after #'valign--force-align-buffer)
+        (advice-add 'org-restart-font-lock
+                    :after #'valign--force-align-buffer)
+        (advice-add 'visible-mode :after #'valign--force-align-buffer)
         (advice-add 'org-table-next-field :after #'valign-table)
         (advice-add 'org-table-previous-field :after #'valign-table))
     (remove-hook 'org-mode-hook #'valign--org-mode-hook)
-    (remove-hook 'org-agenda-finalize-hook #'valign--org-agenda-finalize-hook)
+    (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
+    (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
+    (advice-remove 'org-restart-font-lock #'valign--force-align-buffer)
+    (advice-remove 'visible-mode #'valign--force-align-buffer)
     (advice-remove 'org-table-next-field #'valign-table)
     (advice-remove 'org-table-previous-field #'valign-table)))
 
