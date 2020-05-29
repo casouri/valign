@@ -264,10 +264,11 @@ white space stretching to XPOS, a pixel x position."
           ;; Remove text property.
           (put-text-property p tab-end 'display nil))))))
 
-(defun valign-initial-alignment (beg end)
+(defun valign-initial-alignment (beg end &optional force)
   "Perform initial alignment for tables between BEG and END.
-Supposed to be called from jit-lock."
-  (if (text-property-any beg end 'valign-init nil)
+Supposed to be called from jit-lock.
+Force align if FORCE non-nil."
+  (if (or force (text-property-any beg end 'valign-init nil))
       (save-excursion
         (goto-char beg)
         (while (and (search-forward "|" nil t)
@@ -449,7 +450,10 @@ for the former, and 'multi-column for the latter."
                 (add-hook 'jit-lock-functions
                           #'valign-initial-alignment 90 t)))
     (advice-add #'org-table-next-field :after #'valign-table)
-    (advice-add #'org-table-previous-field :after #'valign-table)))
+    (advice-add #'org-table-previous-field :after #'valign-table)
+    (add-hook 'org-agenda-finalize-hook
+              (lambda () (valign-initial-alignment
+                          (point-min) (point-max) t)))))
 
 (provide 'valign)
 
