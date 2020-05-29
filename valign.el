@@ -122,8 +122,9 @@ calculate images pixel width."
                    (setq width (+ width (car (image-size display t))))
                    (goto-char
                     (next-single-property-change (point) 'display nil to))))
-                ;; 2) Invisible text.
-                ((invisible-p (point))
+                ;; 2) Invisible text.  If text is hidden under ellipses,
+                ;; (outline fold) treat it as non-invisible.
+                ((eq (invisible-p (point)) t)
                  (goto-char
                   (next-single-property-change (point) 'invisible nil to)))
                 ;; 3) This is a normal character, add glyph width.
@@ -462,6 +463,13 @@ for the former, and 'multi-column for the latter."
   "Forcefully realign every table in the buffer."
   (valign-initial-alignment (point-min) (point-max) t))
 
+;; When an org link is in an outline fold, it’s full length
+;; is used, when the subtree is unveiled, org link only shows
+;; part of it’s text, so we need to re-align.
+(defun valign--org-flag-region-advice (beg end _ _1)
+  "Valign hook, realign table between BEG and END."
+  (valign-initial-alignment beg end t))
+
 (define-minor-mode valign-mode
   "valign minor mode."
   :global t
@@ -478,14 +486,16 @@ for the former, and 'multi-column for the latter."
                     :after #'valign--force-align-buffer)
         (advice-add 'visible-mode :after #'valign--force-align-buffer)
         (advice-add 'org-table-next-field :after #'valign-table)
-        (advice-add 'org-table-previous-field :after #'valign-table))
+        (advice-add 'org-table-previous-field :after #'valign-table)
+        (advice-add 'org-flag-region :after #'valign--org-flag-region-advice))
     (remove-hook 'org-mode-hook #'valign--org-mode-hook)
     (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
     (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
     (advice-remove 'org-restart-font-lock #'valign--force-align-buffer)
     (advice-remove 'visible-mode #'valign--force-align-buffer)
     (advice-remove 'org-table-next-field #'valign-table)
-    (advice-remove 'org-table-previous-field #'valign-table)))
+    (advice-remove 'org-table-previous-field #'valign-table)
+    (advice-remove 'org-flag-region #'valign--org-flag-region-advice)))
 
 (provide 'valign)
 
