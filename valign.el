@@ -256,9 +256,10 @@ white space stretching to XPOS, a pixel x position."
                                             (and (consp p)
                                                  (eq (car p) 'space)))))
                       (< (point) end))
-            (put-text-property (prop-match-beginning match)
-                               (prop-match-end match)
-                               'display nil))))
+            (with-silent-modifications
+              (put-text-property (prop-match-beginning match)
+                                 (prop-match-end match)
+                                 'display nil)))))
     (let (display tab-end (p beg) last-p)
       (while (not (eq p last-p))
         (setq last-p p
@@ -271,7 +272,8 @@ white space stretching to XPOS, a pixel x position."
           (setq tab-end (next-single-char-property-change
                          p'display nil end))
           ;; Remove text property.
-          (put-text-property p tab-end 'display nil))))))
+          (with-silent-modifications
+            (put-text-property p tab-end 'display nil)))))))
 
 (defun valign-initial-alignment (beg end &optional force)
   "Perform initial alignment for tables between BEG and END.
@@ -284,7 +286,8 @@ Force align if FORCE non-nil."
                     (< (point) end))
           (valign-table)
           (valign--end-of-table))
-        (put-text-property beg (point) 'valign-init t)))
+        (with-silent-modifications
+          (put-text-property beg (point) 'valign-init t))))
   (cons 'jit-lock-bounds (cons beg end)))
 
 (defun valign--align-separator-row (total-width)
@@ -294,8 +297,8 @@ pixel width counting from the left of the left bar to the left of
 the right bar."
   (let ((p (point)))
     (when (search-forward "|" nil t)
-      (valign--put-text-property
-       p (1- (point)) total-width)
+      (with-silent-modifications
+        (valign--put-text-property p (1- (point)) total-width))
       ;; Why do we have to add an overlay? Because text property
       ;; doens’t work. First, font-lock overwrites what ever face
       ;; property you add; second, even if you are sneaky and added a
@@ -314,7 +317,8 @@ Cell ranges from BEG to END, the pixel position RIGHT-POS marks
 the position for the right bar (“|”)."
   ;; Make “+” look like “|”
   (when (eq (char-after end) ?+)
-    (put-text-property end (1+ end) 'display "|"))
+    (with-silent-modifications
+      (put-text-property end (1+ end) 'display "|")))
   (valign--put-text-property beg end right-pos)
   ;; Why do we have to add an overlay? Because text property
   ;; doens’t work. First, font-lock overwrites what ever face
