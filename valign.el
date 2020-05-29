@@ -121,11 +121,11 @@ calculate images pixel width."
                  (progn
                    (setq width (+ width (car (image-size display t))))
                    (goto-char
-                    (next-single-property-change (point) 'display))))
+                    (next-single-property-change (point) 'display nil to))))
                 ;; 2) Invisible text.
-                ((plist-get (text-properties-at (point)) 'invisible)
+                ((invisible-p (point))
                  (goto-char
-                  (next-single-property-change (point) 'invisible)))
+                  (next-single-property-change (point) 'invisible nil to)))
                 ;; 3) This is a normal character, add glyph width.
                 (t (setq width (+ width (valign--glyph-width-at-point)))
                    (goto-char (1+ (point))))))))
