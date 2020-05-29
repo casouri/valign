@@ -455,6 +455,11 @@ for the former, and 'multi-column for the latter."
   (add-hook 'jit-lock-functions
             #'valign-initial-alignment 90 t))
 
+(defun valign-org-agenda-finalize-hook ()
+  "Valign hook function use by `org-agenda-finalize-hook'."
+  (valign-initial-alignment
+   (point-min) (point-max) t))
+
 (define-minor-mode valign-mode
   "valign minor mode."
   :global t
@@ -464,9 +469,11 @@ for the former, and 'multi-column for the latter."
   (if (and valign-mode window-system)
       (progn
         (add-hook 'org-mode-hook #'valign-org-mode-hook)
+        (add-hook 'org-agenda-finalize-hook #'valign-org-agenda-finalize-hook)
         (advice-add 'org-table-next-field :after #'valign-table)
         (advice-add 'org-table-previous-field :after #'valign-table))
     (remove-hook 'org-mode-hook #'valign-org-mode-hook)
+    (remove-hook 'org-agenda-finalize-hook #'valign-org-agenda-finalize-hook)
     (advice-remove 'org-table-next-field #'valign-table)
     (advice-remove 'org-table-previous-field #'valign-table)))
 
