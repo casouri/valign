@@ -88,6 +88,13 @@ Return nil if not in a cell."
         (valign--skip-space-backward)
         (valign--pixel-width-from-to start (point))))))
 
+;; (defun valign--font-at (p)
+;;   (find-font
+;;    (font-spec
+;;     :name (face-font (get-text-property (point) 'face)
+;;                      nil
+;;                      (char-after)))))
+
 (defun valign--glyph-width-at-point (&optional point)
   "Return the pixel width of the glyph at POINT.
 The buffer has to be visible.  If point is at an image, this
@@ -96,7 +103,14 @@ character’s glyph width."
   (let* ((p (or point (point))))
     ;; car + mapcar to translate the vector to a list.
     (aref (car (mapcar
-                #'identity (font-get-glyphs (font-at p) p (1+ p))))
+                #'identity (font-get-glyphs
+                            ;; (font-at 0 nil (buffer-substring p (1+
+                            ;; p))) doesn’t work, the font is
+                            ;; sometimes wrong.  (font-at p) doesn’t
+                            ;; work, because it requires the buffer to
+                            ;; be visible.
+                            (font-at p)
+                            p (1+ p))))
           4)))
 
 (defun valign--pixel-width-from-to (from to)
@@ -461,28 +475,29 @@ for the former, and 'multi-column for the latter."
 
 (defun valign--org-mode-hook ()
   "Valign hook function used by `org-mode'."
-  (add-hook 'jit-lock-functions #'valign-initial-alignment 90 t))
+  (jit-lock-register #'valign-initial-alignment))
 
 (defun valign--force-align-buffer (&rest _)
   "Forcefully realign every table in the buffer."
   (valign-initial-alignment (point-min) (point-max) t))
 
+(defun valign--realign-on-refontification (&rest _)
+  "Make sure text in the buffer are realigned.
+When they are fontified next time."
+  (with-silent-modifications
+    (put-text-property (point-min) (point-max) 'valign-init nil)))
+
 ;; When an org link is in an outline fold, it’s full length
 ;; is used, when the subtree is unveiled, org link only shows
-;; part of it’s text, so we need to re-align.
-(defun valign--org-flag-region-advice (beg end _ _1)
+;; part of it’s text, so we need to re-align.  This function
+;; runs before the region is flagged. When the text
+;; is shown, jit-lock will make valign realign the text.
+(defun valign--org-flag-region-advice (beg end flag _)
   "Valign hook, realign table between BEG and END."
-  (valign-initial-alignment beg end t))
-
-(defun valign-window-buffer-change-hook (frame)
-  "Makes sure all visible buffers in FRAME are aligned."
-  (dolist (window (window-list frame 'no-minibuf))
-    (with-current-buffer (window-buffer window)
-      (when (and (derived-mode-p 'org-mode)
-                 valign-mode
-                 (text-property-any (point-min) (point-max)
-                                    'valign-init nil))
-        (valign-initial-alignment (point-min) (point-max))))))
+  (when (and (not flag)
+             (text-property-any beg end 'invisible 'org-link))
+    (with-silent-modifications
+      (put-text-property beg end 'valign-init nil))))
 
 (defun valign-reset-buffer ()
   "Remove alignment in the buffer."
@@ -509,27 +524,31 @@ for the former, and 'multi-column for the latter."
   :lighter valign-lighter
   (if (and valign-mode window-system)
       (progn
-        (when (boundp 'window-buffer-change-functions)
-          (add-hook 'window-buffer-change-functions
-                    #'valign-window-buffer-change-hook))
-        (add-hook 'org-mode-hook #'valign--org-mode-hook)
+        (add-hook 'org-mode-hook #'valign--org-mode-hook 90)
         (add-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
         (advice-add 'org-toggle-inline-images
                     :after #'valign--force-align-buffer)
         (advice-add 'org-restart-font-lock
-                    :after #'valign--force-align-buffer)
-        (advice-add 'visible-mode :after #'valign--force-align-buffer)
+                    :before #'valign--realign-on-refontification)
+        (advice-add 'visible-mode
+                    :before #'valign--realign-on-refontification)
         (advice-add 'org-table-next-field :after #'valign-table)
         (advice-add 'org-table-previous-field :after #'valign-table)
-        (advice-add 'org-flag-region :after #'valign--org-flag-region-advice))
-    (when (boundp 'window-buffer-change-functions)
-      (remove-hook 'window-buffer-change-functions
-                   #'valign-window-buffer-change-hook))
+        (advice-add 'org-flag-region :before #'valign--org-flag-region-advice)
+        ;; Force jit-lock to refontify (and thus realign) the buffer.
+        (dolist (buf (buffer-list))
+          (with-current-buffer buf
+            (when (derived-mode-p 'org-mode)
+              (with-silent-modifications
+                (put-text-property
+                 (point-min) (point-max) 'fontified nil)
+                (put-text-property
+                 (point-min) (point-max) 'valign-init nil))))))
     (remove-hook 'org-mode-hook #'valign--org-mode-hook)
     (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
     (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
-    (advice-remove 'org-restart-font-lock #'valign--force-align-buffer)
-    (advice-remove 'visible-mode #'valign--force-align-buffer)
+    (advice-remove 'org-restart-font-lock #'valign--realign-on-refontification)
+    (advice-remove 'visible-mode #'valign--realign-on-refontification)
     (advice-remove 'org-table-next-field #'valign-table)
     (advice-remove 'org-table-previous-field #'valign-table)
     (advice-remove 'org-flag-region #'valign--org-flag-region-advice)
