@@ -509,10 +509,10 @@ for the former, and 'multi-column for the latter."
   :lighter valign-lighter
   (if (and valign-mode window-system)
       (progn
-        (if (boundp 'window-buffer-change-functions)
-            (add-hook 'window-buffer-change-functions
-                      #'valign-window-buffer-change-hook)
-          (add-hook 'org-mode-hook #'valign--org-mode-hook))
+        (when (boundp 'window-buffer-change-functions)
+          (add-hook 'window-buffer-change-functions
+                    #'valign-window-buffer-change-hook))
+        (add-hook 'org-mode-hook #'valign--org-mode-hook)
         (add-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
         (advice-add 'org-toggle-inline-images
                     :after #'valign--force-align-buffer)
@@ -522,10 +522,10 @@ for the former, and 'multi-column for the latter."
         (advice-add 'org-table-next-field :after #'valign-table)
         (advice-add 'org-table-previous-field :after #'valign-table)
         (advice-add 'org-flag-region :after #'valign--org-flag-region-advice))
-    (if (boundp 'window-buffer-change-functions)
-        (remove-hook 'window-buffer-change-functions
-                     #'valign-window-buffer-change-hook)
-      (remove-hook 'org-mode-hook #'valign--org-mode-hook))
+    (when (boundp 'window-buffer-change-functions)
+      (remove-hook 'window-buffer-change-functions
+                   #'valign-window-buffer-change-hook))
+    (remove-hook 'org-mode-hook #'valign--org-mode-hook)
     (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
     (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
     (advice-remove 'org-restart-font-lock #'valign--force-align-buffer)
