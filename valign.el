@@ -351,10 +351,15 @@ the position for the right bar (“|”)."
 
 (defcustom valign-separator-row-style 'multi-column
   "The style of the separator row of a table.
-Valign can render it as “|          |”
+Valign can render it as “|-----------|”
 or as “|-----|-----|”.  Set this option to 'single-column
 for the former, and 'multi-column for the latter."
-  :type 'symbol
+  ;; Restart valign-mode if on.
+  :set (lambda (var val) (set-default var val)
+         (when valign-mode (valign-mode -1) (valign-mode)))
+  :type '(choice
+          (const :tag "Multiple columns" 'multi-column)
+          (const :tag "A single column" 'single-column))
   :group 'valign)
 
 (defun valign-table ()
