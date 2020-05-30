@@ -533,13 +533,18 @@ When they are fontified next time."
         (advice-add 'org-flag-region :before #'valign--org-flag-region-advice)
         ;; Force jit-lock to refontify (and thus realign) the buffer.
         (dolist (buf (buffer-list))
+          ;; If the buffer is visible, realign immediately, if not,
+          ;; realign when it becomes visible.
           (with-current-buffer buf
             (when (derived-mode-p 'org-mode)
-              (with-silent-modifications
-                (put-text-property
-                 (point-min) (point-max) 'fontified nil)
-                (put-text-property
-                 (point-min) (point-max) 'valign-init nil))))))
+              (if (get-buffer-window buf t)
+                  (with-selected-window (get-buffer-window buf t)
+                    (valign-initial-alignment (point-min) (point-max) t))
+                (with-silent-modifications
+                  (put-text-property
+                   (point-min) (point-max) 'fontified nil)
+                  (put-text-property
+                   (point-min) (point-max) 'valign-init nil)))))))
     (remove-hook 'org-mode-hook #'valign--org-mode-hook)
     (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
     (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
