@@ -521,8 +521,7 @@ for the former, and 'multi-column for the latter."
         (advice-add 'visible-mode :after #'valign--force-align-buffer)
         (advice-add 'org-table-next-field :after #'valign-table)
         (advice-add 'org-table-previous-field :after #'valign-table)
-        (advice-add 'org-flag-region :after #'valign--org-flag-region-advice)
-        (valign-initial-alignment (point-min) (point-max)))
+        (advice-add 'org-flag-region :after #'valign--org-flag-region-advice))
     (if (boundp 'window-buffer-change-functions)
         (remove-hook 'window-buffer-change-functions
                      #'valign-window-buffer-change-hook)
