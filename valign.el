@@ -356,7 +356,7 @@ or as “|-----|-----|”.  Set this option to 'single-column
 for the former, and 'multi-column for the latter."
   ;; Restart valign-mode if on.
   :set (lambda (var val) (set-default var val)
-         (when valign-mode (valign-mode -1) (valign-mode)))
+         (when (bound-and-true-p valign-mode) (valign-mode -1) (valign-mode)))
   :type '(choice
           (const :tag "Multiple columns" 'multi-column)
           (const :tag "A single column" 'single-column))
