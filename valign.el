@@ -229,12 +229,16 @@ Start from point, stop at LIMIT."
 Assumes point is on a table.  Return nil if failed, point
 otherwise."
   (beginning-of-line)
+  (skip-chars-forward " \t")
   (if (not (eq (char-after) ?|))
       nil
     (while (eq (char-after) ?|)
-      (forward-line -1))
+      (forward-line -1)
+      (beginning-of-line)
+      (skip-chars-forward " \t"))
     (unless (eq (char-after) ?|)
-      (forward-line))
+      (search-forward "|")
+      (backward-char))
     (point)))
 
 (defun valign--end-of-table ()
@@ -242,11 +246,15 @@ otherwise."
 Assumes point is on a table.  Return nil if failed, point
 otherwise."
   (beginning-of-line)
+  (skip-chars-forward " \t")
   (if (not (eq (char-after) ?|))
       nil
     (while (eq (char-after) ?|)
-      (forward-line 1))
-    (backward-char)
+      (forward-line 1)
+      (beginning-of-line)
+      (skip-chars-forward " \t"))
+    (search-backward "|")
+    (forward-char)
     (point)))
 
 (defun valign--put-text-property (beg end xpos)
