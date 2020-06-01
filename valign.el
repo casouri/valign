@@ -393,7 +393,7 @@ POS-LIST is a list of positions for each column’s right bar."
   ((type (eql markdown-mode)) (style (eql multi-column)) pos-list)
   "Align the separator row in multi column style.
 TYPE must be 'markdown-mode, STYLE is 'multi-column.
-POS-LIST is a list of positions for each column’s right bar. "
+POS-LIST is a list of positions for each column’s right bar."
   (ignore type style)
   (let ((p (point))
         (col-idx 0))
@@ -403,6 +403,14 @@ POS-LIST is a list of positions for each column’s right bar. "
        (or (nth col-idx pos-list) 0))
       (cl-incf col-idx)
       (setq p (point)))))
+
+(cl-defmethod valign--align-separator-row
+  ((type (eql gfm-mode)) (style (eql multi-column)) pos-list)
+  "Align the separator row in multi column style.
+TYPE must be 'gfm-mode, STYLE is 'multi-column.
+POS-LIST is a list of positions for each column’s right bar."
+  (ignore type)
+  (valign--align-separator-row 'markdown-mode style pos-list))
 
 ;;; Userland
 
