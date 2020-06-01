@@ -177,8 +177,8 @@ But we don’t skip over chars with display property."
 (defun valign--sperator-p ()
   "If the current cell is actually a separator.
 Assume point is after the left bar (“|”)."
-  (and (eq (char-before) ?|)
-       (eq (char-after) ?-)))
+  (or (eq (char-after) ?:) ;; Markdown tables.
+      (eq (char-after) ?-)))
 
 (defmacro valign--do-table (column-idx-sym limit &rest body)
   "Go to each cell of a table and evaluate BODY.
@@ -191,7 +191,7 @@ Don’t go over LIMIT."
      (while (and (cl-incf ,column-idx-sym)
                  (search-forward "|" nil t)
                  (< (point) ,limit))
-       (if (eq (char-after (point)) ?\n)
+       (if (looking-at "[^|]*\n")
            ;; We are after the last “|” of a line.
            (setq ,column-idx-sym -1)
          ;; Point is after the left “|”.
@@ -313,12 +313,17 @@ Force align if FORCE non-nil."
           (put-text-property beg (point) 'valign-init t))))
   (cons 'jit-lock-bounds (cons beg end)))
 
-(defun valign--align-separator-row (total-width)
-  "Align the separator row (|---+---|) as “|        |”.
-Assumes the point is after the left bar (“|”).  TOTAL-WIDTH is the
-pixel width counting from the left of the left bar to the left of
-the right bar."
-  (let ((p (point)))
+(cl-defmethod valign--align-separator-row
+  (type (style (eql single-column)) pos-list)
+  "Align the separator row (|---+---|) as “|---------|”.
+Assumes the point is after the left bar (“|”).  TYPE can be
+either 'org-mode or 'markdown, it doesn’t make any difference.
+STYLE is 'single-column.  POS-LIST is a list of each column’s
+right bar’s position."
+  (ignore type style)
+  (let ((p (point))
+        ;; Position of the right-most bar.
+        (total-width (car (last pos-list))))
     (when (search-forward "|" nil t)
       (with-silent-modifications
         (valign--put-text-property p (1- (point)) total-width))
@@ -337,11 +342,20 @@ the right bar."
 (defun valign--separator-row-add-overlay (beg end right-pos)
   "Add overlay to a separator row’s “cell”.
 Cell ranges from BEG to END, the pixel position RIGHT-POS marks
-the position for the right bar (“|”)."
+the position for the right bar (“|”).
+Assumes point is on the right bar or plus sign."
   ;; Make “+” look like “|”
   (when (eq (char-after end) ?+)
     (with-silent-modifications
       (put-text-property end (1+ end) 'display "|")))
+  ;; Markdown row
+  (when (eq (char-after beg) ?:)
+    (setq beg (1+ beg)))
+  (when (eq (char-before end) ?:)
+    (setq end (1- end)
+          right-pos (- right-pos
+                       (valign--glyph-width-at-point (1- end)))))
+  ;; End of Markdown
   (valign--put-text-property beg end right-pos)
   ;; Why do we have to add an overlay? Because text property
   ;; doens’t work. First, font-lock overwrites what ever face
@@ -354,6 +368,41 @@ the position for the right bar (“|”)."
   (let ((ov (make-overlay beg end)))
     (overlay-put ov 'face '(:strike-through t))
     (overlay-put ov 'valign t)))
+
+(cl-defmethod valign--align-separator-row
+  ((type (eql org-mode)) (style (eql multi-column)) pos-list)
+  "Align the separator row in multi column style.
+TYPE must be 'org-mode, STYLE is 'multi-column.
+POS-LIST is a list of positions for each column’s right bar."
+  (ignore type style)
+  (let ((p (point))
+        (col-idx 0))
+    (while (search-forward "+" (line-end-position) t)
+      (valign--separator-row-add-overlay
+       p (1- (point))
+       (or (nth col-idx pos-list) 0))
+      (cl-incf col-idx)
+      (setq p (point)))
+    ;; Last column
+    (when (search-forward "|" (line-end-position) t)
+      (valign--separator-row-add-overlay
+       p (1- (point))
+       (or (nth col-idx pos-list) 0)))))
+
+(cl-defmethod valign--align-separator-row
+  ((type (eql markdown-mode)) (style (eql multi-column)) pos-list)
+  "Align the separator row in multi column style.
+TYPE must be 'markdown-mode, STYLE is 'multi-column.
+POS-LIST is a list of positions for each column’s right bar. "
+  (ignore type style)
+  (let ((p (point))
+        (col-idx 0))
+    (while (search-forward "|" (line-end-position) t)
+      (valign--separator-row-add-overlay
+       p (1- (point))
+       (or (nth col-idx pos-list) 0))
+      (cl-incf col-idx)
+      (setq p (point)))))
 
 ;;; Userland
 
@@ -394,7 +443,8 @@ for the former, and 'multi-column for the latter."
             ;; We don’t align the separator row yet, but will come
             ;; back to it.
             (if (valign--sperator-p)
-                (push (point) separator-row-point-list)
+                (when (eq column-idx 0)
+                  (push (point) separator-row-point-list))
               (save-excursion
                 ;; Check there is a right bar.
                 (when (save-excursion
@@ -462,26 +512,14 @@ for the former, and 'multi-column for the latter."
           ;; After aligning all rows, align the separator row.
           (dolist (row-point separator-row-point-list)
             (goto-char row-point)
-            (pcase valign-separator-row-style
-              ('single-column
-               (valign--align-separator-row (car rev-list)))
-              ('multi-column
-               (let ((p (point))
-                     (col-idx 0))
-                 (while (search-forward "+" (line-end-position) t)
-                   (valign--separator-row-add-overlay
-                    p (1- (point))
-                    (or (nth col-idx (reverse rev-list)) 0))
-                   (cl-incf col-idx)
-                   (setq p (point)))
-                 ;; Last column
-                 (when (search-forward "|" (line-end-position) t)
-                   (valign--separator-row-add-overlay
-                    p (1- (point))
-                    (or (nth col-idx (reverse rev-list)) 0)))))))))
+            (valign--align-separator-row major-mode
+                                         valign-separator-row-style
+                                         (reverse rev-list)))))
 
     (valign-bad-cell (message (error-message-string err)))
     (valign-werid-alignment (message (error-message-string err)))))
+
+;;; Mode intergration
 
 (defun valign--org-mode-hook ()
   "Valign hook function used by `org-mode'."
@@ -526,6 +564,8 @@ When they are fontified next time."
       (when (overlay-get ov 'valign)
         (delete-overlay ov)))))
 
+;;; Userland
+
 (define-minor-mode valign-mode
   "Visually align Org tables."
   :global t
@@ -535,6 +575,7 @@ When they are fontified next time."
   (if (and valign-mode window-system)
       (progn
         (add-hook 'org-mode-hook #'valign--org-mode-hook 90)
+        (add-hook 'markdown-mode-hook #'valign--org-mode-hook 90)
         (add-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
         (advice-add 'org-toggle-inline-images
                     :after #'valign--force-align-buffer)
@@ -542,15 +583,23 @@ When they are fontified next time."
                     :before #'valign--realign-on-refontification)
         (advice-add 'visible-mode
                     :before #'valign--realign-on-refontification)
+        ;; account for hide-link, show-math, and hide markup
+        (advice-add 'markdown-reload-extensions
+                    :before #'valign--realign-on-refontification)
+        (advice-add 'markdown-toggle-inline-images
+                    :after #'valign--force-align-buffer)
         (advice-add 'org-table-next-field :after #'valign-table)
         (advice-add 'org-table-previous-field :after #'valign-table)
+        (advice-add 'markdown-table-align :after #'valign-table)
         (advice-add 'org-flag-region :before #'valign--org-flag-region-advice)
         ;; Force jit-lock to refontify (and thus realign) the buffer.
         (dolist (buf (buffer-list))
           ;; If the buffer is visible, realign immediately, if not,
           ;; realign when it becomes visible.
           (with-current-buffer buf
-            (when (derived-mode-p 'org-mode)
+            (when (or (derived-mode-p 'org-mode)
+                      (derived-mode-p 'markdown-mode))
+              (valign--org-mode-hook)
               (if (get-buffer-window buf t)
                   (with-selected-window (get-buffer-window buf t)
                     (valign-initial-alignment (point-min) (point-max) t))
@@ -560,18 +609,29 @@ When they are fontified next time."
                   (put-text-property
                    (point-min) (point-max) 'valign-init nil)))))))
     (remove-hook 'org-mode-hook #'valign--org-mode-hook)
+    (remove-hook 'markdown-mode-hook #'valign--org-mode-hook)
     (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
     (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
     (advice-remove 'org-restart-font-lock #'valign--realign-on-refontification)
     (advice-remove 'visible-mode #'valign--realign-on-refontification)
     (advice-remove 'org-table-next-field #'valign-table)
     (advice-remove 'org-table-previous-field #'valign-table)
+    (advice-remove 'markdown-table-align #'valign-table)
     (advice-remove 'org-flag-region #'valign--org-flag-region-advice)
+    (advice-remove 'markdown-reload-extensions
+                   #'valign--realign-on-refontification)
+    (advice-remove 'markdown-toggle-inline-images
+                   #'valign--force-align-buffer)
     (dolist (buf (buffer-list))
       (with-current-buffer buf
-        (when (derived-mode-p 'org-mode)
+        (when (or (derived-mode-p 'org-mode)
+                  (derived-mode-p 'markdown-mode))
           (valign-reset-buffer))))))
 
 (provide 'valign)
 
 ;;; valign.el ends here
+
+;; Local Variables:
+;; sentence-end-double-space: t
+;; End:
