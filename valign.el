@@ -553,14 +553,13 @@ When they are fontified next time."
       (progn
         (add-hook 'org-mode-hook #'valign--org-mode-hook 90)
         (add-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
+        (advice-add 'org-table-align :after #'valign-table)
         (advice-add 'org-toggle-inline-images
                     :after #'valign--force-align-buffer)
         (advice-add 'org-restart-font-lock
                     :before #'valign--realign-on-refontification)
         (advice-add 'visible-mode
                     :before #'valign--realign-on-refontification)
-        (advice-add 'org-table-next-field :after #'valign-table)
-        (advice-add 'org-table-previous-field :after #'valign-table)
         (advice-add 'org-flag-region :before #'valign--org-flag-region-advice)
         ;; Force jit-lock to refontify (and thus realign) the buffer.
         (dolist (buf (buffer-list))
@@ -578,11 +577,11 @@ When they are fontified next time."
                    (point-min) (point-max) 'valign-init nil)))))))
     (remove-hook 'org-mode-hook #'valign--org-mode-hook)
     (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
+    
     (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
     (advice-remove 'org-restart-font-lock #'valign--realign-on-refontification)
     (advice-remove 'visible-mode #'valign--realign-on-refontification)
-    (advice-remove 'org-table-next-field #'valign-table)
-    (advice-remove 'org-table-previous-field #'valign-table)
+    (advice-remove 'org-table-align #'valign-table)
     (advice-remove 'org-flag-region #'valign--org-flag-region-advice)
     (dolist (buf (buffer-list))
       (with-current-buffer buf
