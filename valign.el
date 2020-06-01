@@ -183,30 +183,36 @@ calculate images pixel width."
 (defun valign--skip-space-backward ()
   "Like (skip-chars-forward \" \").
 But we don’t skip over chars with display property."
-  (while (and (eq (char-before) ?\s)
-              (let ((display
-                     (plist-get (text-properties-at (1- (point)))
-                                'display)))
-                ;; When do we stop: when there is a display property
-                ;; and it’s not a stretch property.
-                (not (and display
-                          (consp display)
-                          (not (eq (car display) 'space))))))
-    (backward-char)))
+  (condition-case nil
+      (while (and (eq (char-before) ?\s)
+                  (let ((display
+                         (plist-get (text-properties-at (1- (point)))
+                                    'display)))
+                    ;; When do we stop: when there is a display property
+                    ;; and it’s not a stretch property.
+                    (not (and display
+                              (consp display)
+                              (not (eq (car display) 'space))))))
+        (backward-char))
+    (beginning-of-buffer nil)
+    (end-of-buffer nil)))
 
 (defun valign--skip-space-forward ()
   "Like (skip-chars-backward \" \").
 But we don’t skip over chars with display property."
-  (while (and (eq (char-after) ?\s)
-              (let ((display
-                     (plist-get (text-properties-at (point))
-                                'display)))
-                ;; When do we stop: when there is a display property
-                ;; and it’s not a stretch property.
-                (not (and display
-                          (consp display)
-                          (not (eq (car display) 'space))))))
-    (forward-char)))
+  (condition-case nil
+      (while (and (eq (char-after) ?\s)
+                  (let ((display
+                         (plist-get (text-properties-at (point))
+                                    'display)))
+                    ;; When do we stop: when there is a display property
+                    ;; and it’s not a stretch property.
+                    (not (and display
+                              (consp display)
+                              (not (eq (car display) 'space))))))
+        (forward-char))
+    (beginning-of-buffer nil)
+    (end-of-buffer nil)))
 
 (defun valign--sperator-p ()
   "If the current cell is actually a separator.
@@ -299,8 +305,8 @@ otherwise."
   (skip-chars-forward " \t")
   (if (not (eq (char-after) ?|))
       nil
-    (while (eq (char-after) ?|)
-      (forward-line -1)
+    (while (and (eq (char-after) ?|)
+                (eq (forward-line -1) 0))
       (beginning-of-line)
       (skip-chars-forward " \t"))
     (unless (eq (char-after) ?|)
@@ -316,8 +322,8 @@ otherwise."
   (skip-chars-forward " \t")
   (if (not (eq (char-after) ?|))
       nil
-    (while (eq (char-after) ?|)
-      (forward-line 1)
+    (while (and (eq (char-after) ?|)
+                (eq (forward-line 1) 0))
       (beginning-of-line)
       (skip-chars-forward " \t"))
     (search-backward "|")
@@ -450,7 +456,8 @@ POS-LIST is a list of positions for each column’s right bar."
   (ignore type style)
   (let ((p (point))
         (col-idx 0))
-    (while (search-forward "+" (line-end-position) t)
+    (while (and (< (point) (point-max))
+                (search-forward "+" (line-end-position) t))
       (valign--separator-row-add-overlay
        p (1- (point))
        (or (nth col-idx pos-list) 0))
@@ -470,7 +477,8 @@ POS-LIST is a list of positions for each column’s right bar."
   (ignore type style)
   (let ((p (point))
         (col-idx 0))
-    (while (search-forward "|" (line-end-position) t)
+    (while (and (< (point) (point-max))
+                (search-forward "|" (line-end-position) t))
       (valign--separator-row-add-overlay
        p (1- (point))
        (or (nth col-idx pos-list) 0))
