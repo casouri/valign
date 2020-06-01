@@ -303,17 +303,29 @@ Assumes point is on a table.  Return nil if failed, point
 otherwise."
   (beginning-of-line)
   (if (not (looking-at "[ \t]*|")) nil
-    (while (re-search-backward "^[ \t]*|" nil t))
+    (condition-case nil
+        (while (looking-at "[ \t]*|")
+          (search-backward "\n")
+          (beginning-of-line))
+      (search-failed nil))
     (point)))
 
 (defun valign--end-of-table ()
   "Go forward to the end of the table at point.
 Assumes point is on a table.  Return nil if failed, point
 otherwise."
-  (beginning-of-line)
-  (if (not (looking-at "[ \t]*|")) nil
-    (while (re-search-forward "|[^|\n]*$" nil t))
-    (point)))
+  (let ((p (point)))
+    (beginning-of-line)
+    (if (not (looking-at "[ \t]*|"))
+        (progn (goto-char p) nil)
+      (condition-case nil
+          (while (looking-at "[ \t]*|")
+            ;; Each iteration the point is at BOL.
+            (search-forward "\n" nil))
+        (search-failed nil))
+      ;; Point at the line after the last line of the table.
+      (backward-char)
+      (point))))
 
 (defun valign--put-text-property (beg end xpos)
   "Put text property on text from BEG to END.
