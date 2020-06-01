@@ -70,7 +70,7 @@ Assumes point is after the left bar (“|”).
 Doesn’t check if we are in a cell.
 TYPE must be 'markdown-mode.  Simply return HINT."
   (ignore type)
-  hint)
+  (or hint 'left))
 
 (cl-defmethod valign--cell-alignment ((type (eql gfm-mode)) hint)
   "Return how is current cell aligned.
