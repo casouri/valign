@@ -124,13 +124,10 @@ Return nil if not in a cell."
   ;; redisplay calculates tab width based one the iterators position
   ;; on-the-fly, to calculate the exact width of a tab, you need to
   ;; know it’s _position_, that means calculating from the left edge).
-  (* (or tab-width 8) ;; FIXME For some unknown reason, tab-width is
-                      ;; sometimes nil, someone should investigate.
-     (aref (car (mapcar
-                 #'identity (font-get-glyphs
-                             font
-                             0 1 " ")))
-           4)))
+  (* (or tab-width 8)
+     ;; FIXME For some unknown reason, tab-width is
+     ;; sometimes nil, someone should investigate.
+     (aref (aref (font-get-glyphs font 0 1 " ") 0) 4)))
 
 (defun valign--glyph-width-at-point (&optional point)
   "Return the pixel width of the glyph at POINT.
@@ -141,16 +138,10 @@ character’s glyph width."
     ;; car + mapcar to translate the vector to a list.
     (if (eq (char-after point) ?\t)
         (valign--tab-width (font-at p))
-      (aref (car (mapcar
-                  #'identity (font-get-glyphs
-                              ;; (font-at 0 nil (buffer-substring p (1+
-                              ;; p))) doesn’t work, the font is
-                              ;; sometimes wrong.  (font-at p) doesn’t
-                              ;; work, because it requires the buffer to
-                              ;; be visible.
-                              (font-at p)
-                              p (1+ p))))
-            4))))
+      ;; (font-at 0 nil (buffer-substring p (1+ p))) doesn’t work, the
+      ;; font is sometimes wrong.  (font-at p) doesn’t work, because
+      ;; it requires the buffer to be visible.
+      (aref (aref (font-get-glyphs (font-at p) p (1+ p)) 0) 4))))
 
 (defun valign--pixel-width-from-to (from to)
   "Return the width of the glyphs from FROM (inclusive) to TO (exclusive).
