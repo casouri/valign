@@ -366,6 +366,12 @@ Force align if FORCE non-nil."
           (put-text-property beg (point) 'valign-init t))))
   (cons 'jit-lock-bounds (cons beg end)))
 
+(defun valign-always-align (beg end)
+  "Perform initial alignment for tables between BEG and END.
+Supposed to be called from jit-lock.  Unlike
+`valign-initial-ailgnment', always realign."
+  (valign-initial-alignment beg end t))
+
 (cl-defmethod valign--align-separator-row
   (type (style (eql single-column)) pos-list)
   "Align the separator row (|---+---|) as “|---------|”.
@@ -592,6 +598,12 @@ for the former, and 'multi-column for the latter."
   "Valign hook function used by `org-mode'."
   (jit-lock-register #'valign-initial-alignment))
 
+(defun valign--markdown-mode-hook ()
+  "Valign hook function used by `markdown-mode'."
+  ;; We want our hook run after other markdown fontifications,
+  ;; because they mess up our alignment (which is not cool).
+  (add-hook 'jit-lock-functions #'valign-always-align 98 t))
+
 (defun valign--force-align-buffer (&rest _)
   "Forcefully realign every table in the buffer."
   (valign-initial-alignment (point-min) (point-max) t))
@@ -642,7 +654,7 @@ When they are fontified next time."
   (if (and valign-mode window-system)
       (progn
         (add-hook 'org-mode-hook #'valign--org-mode-hook 90)
-        (add-hook 'markdown-mode-hook #'valign--org-mode-hook 90)
+        (add-hook 'markdown-mode-hook #'valign--markdown-mode-hook 90)
         (add-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
         (advice-add 'org-toggle-inline-images
                     :after #'valign--force-align-buffer)
@@ -666,7 +678,6 @@ When they are fontified next time."
           (with-current-buffer buf
             (when (or (derived-mode-p 'org-mode)
                       (derived-mode-p 'markdown-mode))
-              (valign--org-mode-hook)
               (if (get-buffer-window buf t)
                   (with-selected-window (get-buffer-window buf t)
                     (valign-initial-alignment (point-min) (point-max) t))
@@ -674,9 +685,13 @@ When they are fontified next time."
                   (put-text-property
                    (point-min) (point-max) 'fontified nil)
                   (put-text-property
-                   (point-min) (point-max) 'valign-init nil)))))))
+                   (point-min) (point-max) 'valign-init nil))))
+            (cond ((derived-mode-p 'org-mode)
+                   (valign--org-mode-hook))
+                  ((derived-mode-p 'markdown-mode)
+                   (valign--markdown-mode-hook))))))
     (remove-hook 'org-mode-hook #'valign--org-mode-hook)
-    (remove-hook 'markdown-mode-hook #'valign--org-mode-hook)
+    (remove-hook 'markdown-mode-hook #'valign--markdown-mode-hook)
     (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
     (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
     (advice-remove 'org-restart-font-lock #'valign--realign-on-refontification)
