@@ -302,16 +302,8 @@ Start from point, stop at LIMIT."
 Assumes point is on a table.  Return nil if failed, point
 otherwise."
   (beginning-of-line)
-  (skip-chars-forward " \t")
-  (if (not (eq (char-after) ?|))
-      nil
-    (while (and (eq (char-after) ?|)
-                (eq (forward-line -1) 0))
-      (beginning-of-line)
-      (skip-chars-forward " \t"))
-    (unless (eq (char-after) ?|)
-      (search-forward "|")
-      (backward-char))
+  (if (not (looking-at "[ \t]*|")) nil
+    (while (re-search-backward "^[ \t]*|" nil t))
     (point)))
 
 (defun valign--end-of-table ()
@@ -319,16 +311,9 @@ otherwise."
 Assumes point is on a table.  Return nil if failed, point
 otherwise."
   (beginning-of-line)
-  (skip-chars-forward " \t")
-  (if (not (eq (char-after) ?|))
-      nil
-    (while (and (eq (char-after) ?|)
-                (eq (forward-line 1) 0))
-      (beginning-of-line)
-      (skip-chars-forward " \t"))
-    (search-backward "|")
-    (forward-char)
-    (point)))
+  (if (not (looking-at "[ \t]*|")) nil
+    (while (re-search-forward "|[^|]*$" nil t))
+    (line-end-position)))
 
 (defun valign--put-text-property (beg end xpos)
   "Put text property on text from BEG to END.
