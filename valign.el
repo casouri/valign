@@ -40,11 +40,13 @@
 (define-error 'valign-werid-alignment
   "Valign expects one space between the cell’s content and either the left bar or the right bar, but this cell seems to violate that assumption")
 
-(defun valign--cell-alignment ()
+(cl-defmethod valign--cell-alignment ((type (eql org-mode)) hint)
   "Return how is current cell aligned.
 Return 'left if aligned left, 'right if aligned right.
 Assumes point is after the left bar (“|”).
-Doesn’t check if we are in a cell."
+Doesn’t check if we are in a cell.
+TYPE must be 'org-mode.  HINT is not used."
+  (ignore type hint)
   (save-excursion
     (if (looking-at " [^ ]")
         'left
@@ -54,6 +56,24 @@ Doesn’t check if we are in a cell."
              "[^ ] |" (max (- (point) 3) (point-min)))
             'right
           (signal 'valign-werid-alignment nil))))))
+
+(cl-defmethod valign--cell-alignment ((type (eql markdown-mode)) hint)
+  "Return how is current cell aligned.
+Return 'left if aligned left, 'right if aligned right.
+Assumes point is after the left bar (“|”).
+Doesn’t check if we are in a cell.
+TYPE must be 'markdown-mode.  Simply return HINT."
+  (ignore type)
+  hint)
+
+(cl-defmethod valign--cell-alignment ((type (eql gfm-mode)) hint)
+  "Return how is current cell aligned.
+Return 'left if aligned left, 'right if aligned right.
+Assumes point is after the left bar (“|”).
+Doesn’t check if we are in a cell.
+TYPE must be 'markdown-mode.  Simply return HINT."
+  (ignore type)
+  (valign--cell-alignment 'markdown-mode hint))
 
 ;; (if (string-match (rx (seq (* " ")
 ;;                            ;; e.g., “5.”, “5.4”
@@ -180,6 +200,18 @@ Assume point is after the left bar (“|”)."
   (or (eq (char-after) ?:) ;; Markdown tables.
       (eq (char-after) ?-)))
 
+(defun valign--alignment-from-seperator ()
+  "Return the alignment of this column.
+Assumes point is after the left bar (“|”) of a separator
+cell.  We don’t distinguish between left and center aligned."
+  (save-excursion
+    (if (eq (char-after) ?:)
+        'left
+      (skip-chars-forward "-")
+      (if (eq (char-after) ?:)
+          'right
+        'left))))
+
 (defmacro valign--do-table (column-idx-sym limit &rest body)
   "Go to each cell of a table and evaluate BODY.
 In each cell point stops after the left “|”.
@@ -197,11 +229,23 @@ Don’t go over LIMIT."
          ;; Point is after the left “|”.
          (progn ,@body)))))
 
-(defun valign--calculate-column-width-list (limit)
+(cl-defstruct valign-table-info
+  "Information about the current table."
+  ;; Width of each column.
+  column-width-list
+  ;; Alignment of each column, can be either 'left or 'right, only
+  ;; used by markdown.  (Technically we can determine the alignment
+  ;; from each cell’s padding spaces, but the widest cell in a
+  ;; right-aligned column has one space on both side, and we can’t
+  ;; determine the alignment for that cell.)
+  column-alignment-list)
+
+(defun valign--calculate-table-info (limit)
   "Return a list of column widths.
 Each column width is the largest cell width of the column.
 Start from point, stop at LIMIT."
   (let (column-width-alist
+        column-alignment-alist
         column-idx)
     (save-excursion
       (valign--do-table column-idx limit
@@ -214,15 +258,24 @@ Start from point, stop at LIMIT."
                 (cell-width (valign--cell-width)))
             (if (> cell-width (or oldmax 0))
                 (setf (alist-get column-idx column-width-alist)
-                      cell-width))))))
+                      cell-width))))
+        ;; Calculate the alignment if we are on the separator row
+        ;; for markdown.
+        (when (valign--sperator-p)
+          (setf (alist-get column-idx column-alignment-alist)
+                (valign--alignment-from-seperator)))))
     ;; Turn alist into a list.
-    (let ((inc 0) return-list)
+    (let ((inc 0) return-width-list return-alignment-list)
       (while (alist-get inc column-width-alist)
         ;; Add 16 pixels of padding.
         (push (+ (alist-get inc column-width-alist) 16)
-              return-list)
+              return-width-list)
+        (push (alist-get inc column-alignment-alist)
+              return-alignment-list)
         (cl-incf inc))
-      (nreverse return-list))))
+      (make-valign-table-info
+       :column-width-list (reverse return-width-list)
+       :column-alignment-list (reverse return-alignment-list)))))
 
 (defun valign--beginning-of-table ()
   "Go backward to the beginning of the table at point.
@@ -434,7 +487,8 @@ for the former, and 'multi-column for the latter."
   (condition-case err
       (save-excursion
         (let (end column-width-list column-idx pos ssw bar-width
-                  separator-row-point-list rev-list right-point)
+                  separator-row-point-list rev-list right-point
+                  column-alignment-list info)
           ;; ‘separator-row-point-list’ marks the point for each
           ;; separator-row, so we can later come back and align them.
           ;; ‘rev-list’ is the reverse list of right positions of each
@@ -444,8 +498,11 @@ for the former, and 'multi-column for the latter."
               (user-error "Not on a table"))
           (setq end (point))
           (valign--beginning-of-table)
+          (setq info (valign--calculate-table-info end))
           (setq column-width-list
-                (valign--calculate-column-width-list end))
+                (valign-table-info-column-width-list info)
+                column-alignment-list
+                (valign-table-info-column-alignment-list info))
           ;; Iterate each cell and apply tab stops.
           (valign--do-table column-idx end
             ;; We don’t align the separator row yet, but will come
@@ -498,7 +555,9 @@ for the former, and 'multi-column for the latter."
                              (1+ tab-start) (point)
                              (+ pos col-width ssw))))
                       ;; Align a left-aligned cell.
-                      (pcase (valign--cell-alignment)
+                      (pcase (valign--cell-alignment
+                              major-mode
+                              (nth column-idx column-alignment-list))
                         ('left (search-forward "|" nil t)
                                (backward-char)
                                (setq tab-end (point))
