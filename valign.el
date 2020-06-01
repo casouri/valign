@@ -638,7 +638,7 @@ When they are fontified next time."
 ;; part of it’s text, so we need to re-align.  This function
 ;; runs before the region is flagged. When the text
 ;; is shown, jit-lock will make valign realign the text.
-(defun valign--org-flag-region-advice (beg end flag _)
+(defun valign--org-flag-region-advice (beg end flag &optional _)
   "Valign hook, realign table between BEG and END."
   (when (and (not flag)
              (text-property-any beg end 'invisible 'org-link))
@@ -688,7 +688,10 @@ When they are fontified next time."
         (advice-add 'markdown-toggle-inline-images
                     :after #'valign--force-align-buffer)
         (advice-add 'markdown-table-align :after #'valign-table)
-        (advice-add 'org-flag-region :before #'valign--org-flag-region-advice)
+        (advice-add 'org-flag-region
+                    :before #'valign--org-flag-region-advice)
+        (advice-add 'outline-flag-region
+                    :before #'valign--org-flag-region-advice)
         ;; Force jit-lock to refontify (and thus realign) the buffer.
         (dolist (buf (buffer-list))
           ;; If the buffer is visible, realign immediately, if not,
@@ -718,6 +721,7 @@ When they are fontified next time."
     (advice-remove 'org-table-align #'valign-table)
     (advice-remove 'markdown-table-align #'valign-table)
     (advice-remove 'org-flag-region #'valign--org-flag-region-advice)
+    (advice-remove 'outline-flag-region #'valign--org-flag-region-advice)
     (advice-remove 'markdown-reload-extensions
                    #'valign--realign-on-refontification)
     (advice-remove 'markdown-toggle-inline-images
