@@ -308,6 +308,9 @@ otherwise."
           (search-backward "\n")
           (beginning-of-line))
       (search-failed nil))
+    (unless (looking-at "[ \t]*|")
+      (forward-line 1)
+      (beginning-of-line))
     (point)))
 
 (defun valign--end-of-table ()
