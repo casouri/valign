@@ -312,8 +312,8 @@ Assumes point is on a table.  Return nil if failed, point
 otherwise."
   (beginning-of-line)
   (if (not (looking-at "[ \t]*|")) nil
-    (while (re-search-forward "|[^|]*$" nil t))
-    (line-end-position)))
+    (while (re-search-forward "|[^|\n]*$" nil t))
+    (point)))
 
 (defun valign--put-text-property (beg end xpos)
   "Put text property on text from BEG to END.
