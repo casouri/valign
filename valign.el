@@ -378,8 +378,8 @@ Force align if FORCE non-nil."
   ;; Technically we don’t need to check if the current buffer
   ;; is visible, but third-party packages refontify buffers
   ;; before they are visible, like org-superstart.
-  (when ((get-buffer-window (current-buffer))
-         (or force (text-property-any beg end 'valign-init nil)))
+  (when (and (get-buffer-window (current-buffer))
+             (or force (text-property-any beg end 'valign-init nil)))
     (save-excursion
       (goto-char beg)
       (while (and (search-forward "|" nil t)
