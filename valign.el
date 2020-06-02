@@ -375,15 +375,19 @@ white space stretching to XPOS, a pixel x position."
   "Perform initial alignment for tables between BEG and END.
 Supposed to be called from jit-lock.
 Force align if FORCE non-nil."
-  (if (or force (text-property-any beg end 'valign-init nil))
-      (save-excursion
-        (goto-char beg)
-        (while (and (search-forward "|" nil t)
-                    (< (point) end))
-          (valign-table)
-          (valign--end-of-table))
-        (with-silent-modifications
-          (put-text-property beg (point) 'valign-init t))))
+  ;; Technically we don’t need to check if the current buffer
+  ;; is visible, but third-party packages refontify buffers
+  ;; before they are visible, like org-superstart.
+  (when ((get-buffer-window (current-buffer))
+         (or force (text-property-any beg end 'valign-init nil)))
+    (save-excursion
+      (goto-char beg)
+      (while (and (search-forward "|" nil t)
+                  (< (point) end))
+        (valign-table)
+        (valign--end-of-table))
+      (with-silent-modifications
+        (put-text-property beg (point) 'valign-init t))))
   (cons 'jit-lock-bounds (cons beg end)))
 
 (defun valign-always-align (beg end)
