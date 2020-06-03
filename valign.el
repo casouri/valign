@@ -297,6 +297,12 @@ Start from point, stop at LIMIT."
        :column-width-list (reverse return-width-list)
        :column-alignment-list (reverse return-alignment-list)))))
 
+(defun valign--at-table-p ()
+  "Return non-nil if point is in a table."
+  (save-excursion
+    (beginning-of-line)
+    (looking-at "[ \t]*|")))
+
 (defun valign--beginning-of-table ()
   "Go backward to the beginning of the table at point.
 Assumes point is on a table.  Return nil if failed, point
@@ -375,16 +381,12 @@ white space stretching to XPOS, a pixel x position."
   "Perform initial alignment for tables between BEG and END.
 Supposed to be called from jit-lock.
 Force align if FORCE non-nil."
-  ;; Technically we don’t need to check if the current buffer
-  ;; is visible, but third-party packages refontify buffers
-  ;; before they are visible, like org-superstart.
-  (when (and (get-buffer-window (current-buffer))
-             (or force (text-property-any beg end 'valign-init nil)))
+  (when (or force (text-property-any beg end 'valign-init nil))
     (save-excursion
       (goto-char beg)
       (while (and (search-forward "|" nil t)
                   (< (point) end))
-        (valign-table)
+        (valign-table-quite)
         (valign--end-of-table))
       (with-silent-modifications
         (put-text-property beg (point) 'valign-init t))))
@@ -624,6 +626,12 @@ for the former, and 'multi-column for the latter."
   "Valign hook function used by `org-mode'."
   (jit-lock-register #'valign-initial-alignment))
 
+(defun valign-table-quite ()
+  "Align table, but only if buffer is visible."
+  (when (and (valign--at-table-p)
+             (get-buffer-window (current-buffer)))
+    (valign-table)))
+
 (defun valign--markdown-mode-hook ()
   "Valign hook function used by `markdown-mode'."
   ;; We want our hook run after other markdown fontifications,
@@ -682,7 +690,7 @@ When they are fontified next time."
         (add-hook 'org-mode-hook #'valign--org-mode-hook 90)
         (add-hook 'markdown-mode-hook #'valign--markdown-mode-hook 90)
         (add-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
-        (advice-add 'org-table-align :after #'valign-table)
+        (advice-add 'org-table-align :after #'valign-table-quite)
         (advice-add 'org-toggle-inline-images
                     :after #'valign--force-align-buffer)
         (advice-add 'org-restart-font-lock
@@ -694,7 +702,7 @@ When they are fontified next time."
                     :before #'valign--realign-on-refontification)
         (advice-add 'markdown-toggle-inline-images
                     :after #'valign--force-align-buffer)
-        (advice-add 'markdown-table-align :after #'valign-table)
+        (advice-add 'markdown-table-align :after #'valign-table-quite)
         (advice-add 'org-flag-region
                     :before #'valign--org-flag-region-advice)
         (advice-add 'outline-flag-region
@@ -725,8 +733,8 @@ When they are fontified next time."
     (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
     (advice-remove 'org-restart-font-lock #'valign--realign-on-refontification)
     (advice-remove 'visible-mode #'valign--realign-on-refontification)
-    (advice-remove 'org-table-align #'valign-table)
-    (advice-remove 'markdown-table-align #'valign-table)
+    (advice-remove 'org-table-align #'valign-table-quite)
+    (advice-remove 'markdown-table-align #'valign-table-quite)
     (advice-remove 'org-flag-region #'valign--org-flag-region-advice)
     (advice-remove 'outline-flag-region #'valign--org-flag-region-advice)
     (advice-remove 'markdown-reload-extensions
