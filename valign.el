@@ -46,7 +46,8 @@
 (define-error 'valign-werid-alignment
   "Valign expects one space between the cell’s content and either the left bar or the right bar, but this cell seems to violate that assumption")
 
-(cl-defmethod valign--cell-alignment ((type (eql org-mode)) hint)
+(cl-defmethod valign--cell-alignment
+  ((type (derived-mode org-mode)) hint)
   "Return how is current cell aligned.
 Return 'left if aligned left, 'right if aligned right.
 Assumes point is after the left bar (“|”).
@@ -63,7 +64,8 @@ TYPE must be 'org-mode.  HINT is not used."
             'right
           (signal 'valign-werid-alignment nil))))))
 
-(cl-defmethod valign--cell-alignment ((type (eql markdown-mode)) hint)
+(cl-defmethod valign--cell-alignment
+  ((type (derived-mode markdown-mode)) hint)
   "Return how is current cell aligned.
 Return 'left if aligned left, 'right if aligned right.
 Assumes point is after the left bar (“|”).
@@ -71,15 +73,6 @@ Doesn’t check if we are in a cell.
 TYPE must be 'markdown-mode.  Simply return HINT."
   (ignore type)
   (or hint 'left))
-
-(cl-defmethod valign--cell-alignment ((type (eql gfm-mode)) hint)
-  "Return how is current cell aligned.
-Return 'left if aligned left, 'right if aligned right.
-Assumes point is after the left bar (“|”).
-Doesn’t check if we are in a cell.
-TYPE must be 'markdown-mode.  Simply return HINT."
-  (ignore type)
-  (valign--cell-alignment 'markdown-mode hint))
 
 ;; (if (string-match (rx (seq (* " ")
 ;;                            ;; e.g., “5.”, “5.4”
@@ -455,7 +448,7 @@ Assumes point is on the right bar or plus sign."
     (overlay-put ov 'valign t)))
 
 (cl-defmethod valign--align-separator-row
-  ((type (eql org-mode)) (style (eql multi-column)) pos-list)
+  ((type (derived-mode org-mode)) (style (eql multi-column)) pos-list)
   "Align the separator row in multi column style.
 TYPE must be 'org-mode, STYLE is 'multi-column.
 POS-LIST is a list of positions for each column’s right bar."
@@ -476,7 +469,8 @@ POS-LIST is a list of positions for each column’s right bar."
        (or (nth col-idx pos-list) 0)))))
 
 (cl-defmethod valign--align-separator-row
-  ((type (eql markdown-mode)) (style (eql multi-column)) pos-list)
+  ((type (derived-mode markdown-mode))
+   (style (eql multi-column)) pos-list)
   "Align the separator row in multi column style.
 TYPE must be 'markdown-mode, STYLE is 'multi-column.
 POS-LIST is a list of positions for each column’s right bar."
@@ -490,14 +484,6 @@ POS-LIST is a list of positions for each column’s right bar."
        (or (nth col-idx pos-list) 0))
       (cl-incf col-idx)
       (setq p (point)))))
-
-(cl-defmethod valign--align-separator-row
-  ((type (eql gfm-mode)) (style (eql multi-column)) pos-list)
-  "Align the separator row in multi column style.
-TYPE must be 'gfm-mode, STYLE is 'multi-column.
-POS-LIST is a list of positions for each column’s right bar."
-  (ignore type)
-  (valign--align-separator-row 'markdown-mode style pos-list))
 
 ;;; Userland
 
