@@ -693,6 +693,8 @@ When they are fontified next time."
                     :before #'valign--org-flag-region-advice)
         (advice-add 'outline-flag-region
                     :before #'valign--org-flag-region-advice)
+        (advice-add 'text-scale-increase :after (lambda (inc) (valign--force-align-buffer)))
+        (advice-add 'text-scale-decrease :after (lambda (dec) (valign--force-align-buffer)))
         ;; Force jit-lock to refontify (and thus realign) the buffer.
         (dolist (buf (buffer-list))
           ;; If the buffer is visible, realign immediately, if not,
@@ -715,7 +717,7 @@ When they are fontified next time."
     (remove-hook 'org-mode-hook #'valign--org-mode-hook)
     (remove-hook 'markdown-mode-hook #'valign--markdown-mode-hook)
     (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
-    
+
     (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
     (advice-remove 'org-restart-font-lock #'valign--realign-on-refontification)
     (advice-remove 'visible-mode #'valign--realign-on-refontification)
@@ -727,6 +729,8 @@ When they are fontified next time."
                    #'valign--realign-on-refontification)
     (advice-remove 'markdown-toggle-inline-images
                    #'valign--force-align-buffer)
+    (advice-remove 'text-scale-increase (lambda (inc) (valign--force-align-buffer)))
+    (advice-remove 'text-scale-decrease (lambda (inc) (valign--force-align-buffer)))
     (dolist (buf (buffer-list))
       (with-current-buffer buf
         (when (or (derived-mode-p 'org-mode)
