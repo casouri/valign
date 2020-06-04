@@ -47,7 +47,7 @@
   "Valign expects one space between the cell’s content and either the left bar or the right bar, but this cell seems to violate that assumption")
 
 (cl-defmethod valign--cell-alignment
-  ((type (derived-mode org-mode)) hint)
+  ((type (derived-mode org-mode org-agenda-mode)) hint)
   "Return how is current cell aligned.
 Return 'left if aligned left, 'right if aligned right.
 Assumes point is after the left bar (“|”).
@@ -448,7 +448,8 @@ Assumes point is on the right bar or plus sign."
     (overlay-put ov 'valign t)))
 
 (cl-defmethod valign--align-separator-row
-  ((type (derived-mode org-mode)) (style (eql multi-column)) pos-list)
+  ((type (derived-mode org-mode org-agenda-mode))
+   (style (eql multi-column)) pos-list)
   "Align the separator row in multi column style.
 TYPE must be 'org-mode, STYLE is 'multi-column.
 POS-LIST is a list of positions for each column’s right bar."
