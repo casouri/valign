@@ -64,6 +64,12 @@ TYPE must be 'org-mode.  HINT is not used."
             'right
           (signal 'valign-werid-alignment nil))))))
 
+;; Currently multiple derived-mode specializers are not supported.
+;; See cl-generic.el:1203.
+(cl-defmethod valign--cell-alignment
+  ((type (derived-mode org-agenda-mode)) hint)
+  (valign--cell-alignment 'org-mode hint))
+
 (cl-defmethod valign--cell-alignment
   ((type (derived-mode markdown-mode)) hint)
   "Return how is current cell aligned.
@@ -448,7 +454,7 @@ Assumes point is on the right bar or plus sign."
     (overlay-put ov 'valign t)))
 
 (cl-defmethod valign--align-separator-row
-  ((type (derived-mode org-mode org-agenda-mode))
+  ((type (derived-mode org-mode))
    (style (eql multi-column)) pos-list)
   "Align the separator row in multi column style.
 TYPE must be 'org-mode, STYLE is 'multi-column.
@@ -468,6 +474,10 @@ POS-LIST is a list of positions for each column’s right bar."
       (valign--separator-row-add-overlay
        p (1- (point))
        (or (nth col-idx pos-list) 0)))))
+
+(cl-defmethod valign--align-separator-row
+  ((type (derived-mode org-agenda-mode)) style pos-list)
+  (valign--align-separator-row 'org-mode style pos-list))
 
 (cl-defmethod valign--align-separator-row
   ((type (derived-mode markdown-mode))
