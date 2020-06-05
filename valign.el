@@ -46,8 +46,7 @@
 (define-error 'valign-werid-alignment
   "Valign expects one space between the cell’s content and either the left bar or the right bar, but this cell seems to violate that assumption")
 
-(cl-defmethod valign--cell-alignment
-  ((type (derived-mode org-mode org-agenda-mode)) hint)
+(cl-defmethod valign--cell-alignment ((type (eql org)) hint)
   "Return how is current cell aligned.
 Return 'left if aligned left, 'right if aligned right.
 Assumes point is after the left bar (“|”).
@@ -64,14 +63,8 @@ TYPE must be 'org-mode.  HINT is not used."
             'right
           (signal 'valign-werid-alignment nil))))))
 
-;; Currently multiple derived-mode specializers are not supported.
-;; See cl-generic.el:1203.
 (cl-defmethod valign--cell-alignment
-  ((type (derived-mode org-agenda-mode)) hint)
-  (valign--cell-alignment 'org-mode hint))
-
-(cl-defmethod valign--cell-alignment
-  ((type (derived-mode markdown-mode)) hint)
+  ((type (eql markdown)) hint)
   "Return how is current cell aligned.
 Return 'left if aligned left, 'right if aligned right.
 Assumes point is after the left bar (“|”).
@@ -454,8 +447,7 @@ Assumes point is on the right bar or plus sign."
     (overlay-put ov 'valign t)))
 
 (cl-defmethod valign--align-separator-row
-  ((type (derived-mode org-mode))
-   (style (eql multi-column)) pos-list)
+  ((type (eql org)) (style (eql multi-column)) pos-list)
   "Align the separator row in multi column style.
 TYPE must be 'org-mode, STYLE is 'multi-column.
 POS-LIST is a list of positions for each column’s right bar."
@@ -476,12 +468,7 @@ POS-LIST is a list of positions for each column’s right bar."
        (or (nth col-idx pos-list) 0)))))
 
 (cl-defmethod valign--align-separator-row
-  ((type (derived-mode org-agenda-mode)) style pos-list)
-  (valign--align-separator-row 'org-mode style pos-list))
-
-(cl-defmethod valign--align-separator-row
-  ((type (derived-mode markdown-mode))
-   (style (eql multi-column)) pos-list)
+  ((type (eql markdown)) (style (eql multi-column)) pos-list)
   "Align the separator row in multi column style.
 TYPE must be 'markdown-mode, STYLE is 'multi-column.
 POS-LIST is a list of positions for each column’s right bar."
@@ -495,6 +482,14 @@ POS-LIST is a list of positions for each column’s right bar."
        (or (nth col-idx pos-list) 0))
       (cl-incf col-idx)
       (setq p (point)))))
+
+(defun valign--guess-table-type ()
+  "Return either 'org or 'markdown."
+  (cond ((derived-mode-p 'org-mode 'org-agenda-mode) 'org)
+        ((derived-mode-p 'markdown-mode) 'markdown)
+        ((string-match-p "org" (symbol-name major-mode)) 'org)
+        ((string-match-p "markdown" (symbol-name major-mode)) 'markdown)
+        (t 'org)))
 
 ;;; Userland
 
@@ -587,7 +582,7 @@ for the former, and 'multi-column for the latter."
                              (+ pos col-width ssw))))
                       ;; Align a left-aligned cell.
                       (pcase (valign--cell-alignment
-                              major-mode
+                              (valign--guess-table-type)
                               (nth column-idx column-alignment-list))
                         ('left (search-forward "|" nil t)
                                (backward-char)
@@ -610,7 +605,7 @@ for the former, and 'multi-column for the latter."
           ;; After aligning all rows, align the separator row.
           (dolist (row-point separator-row-point-list)
             (goto-char row-point)
-            (valign--align-separator-row major-mode
+            (valign--align-separator-row (valign--guess-table-type)
                                          valign-separator-row-style
                                          (reverse rev-list)))))
 
