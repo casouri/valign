@@ -2,7 +2,7 @@
 
 ;; Author: Yuan Fu <casouri@gmail.com>
 ;; URL: https://github.com/casouri/valign
-;; Version: 0.1.0
+;; Version: 1.0.0
 ;; Keywords: convenience
 ;; Package-Requires: ((emacs "26.0"))
 
