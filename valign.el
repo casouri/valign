@@ -45,6 +45,8 @@
 (define-error 'valign-bad-cell "Valign encountered a invalid table cell")
 (define-error 'valign-werid-alignment
   "Valign expects one space between the cell’s content and either the left bar or the right bar, but this cell seems to violate that assumption")
+(define-error 'valign-not-gui "Valign only works in GUI environment")
+(define-error 'valign-not-on-table "Valign is asked to align a table, but the point is not on one")
 
 (cl-defmethod valign--cell-alignment ((type (eql org)) hint)
   "Return how is current cell aligned.
@@ -510,6 +512,8 @@ for the former, and 'multi-column for the latter."
 (defun valign-table ()
   "Visually align the table at point."
   (interactive)
+  (if (not window-system)
+      (signal 'valign-not-gui nil))
   (condition-case err
       (save-excursion
         (let (end column-width-list column-idx pos ssw bar-width
@@ -521,7 +525,7 @@ for the former, and 'multi-column for the latter."
           ;; separator row cell. ‘right-point’ marks point before the
           ;; right bar for each cell.
           (if (not (valign--end-of-table))
-              (user-error "Not on a table"))
+              (signal 'valign-not-on-table nil))
           (setq end (point))
           (valign--beginning-of-table)
           (setq info (valign--calculate-table-info end))
@@ -610,7 +614,9 @@ for the former, and 'multi-column for the latter."
                                          (reverse rev-list)))))
 
     (valign-bad-cell (message (error-message-string err)))
-    (valign-werid-alignment (message (error-message-string err)))))
+    (valign-werid-alignment (message (error-message-string err)))
+    (valign-not-gui (message (error-message-string err)))
+    (valign-not-on-table (message (error-message-string err)))))
 
 ;;; Mode intergration
 
@@ -620,7 +626,8 @@ for the former, and 'multi-column for the latter."
 
 (defun valign-table-quite ()
   "Align table, but only if buffer is visible."
-  (when (and (valign--at-table-p)
+  (when (and window-system
+             (valign--at-table-p)
              (get-buffer-window (current-buffer)))
     (valign-table)))
 
