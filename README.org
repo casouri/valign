@@ -13,5 +13,7 @@ Features not yet supported:
 
 If you are interested in adding support for them, look into ~valign--pixel-width-from-to~.
 
-You can use style below by customizing ~valign-separator-row-style~.
+* Customization
+You can get the style below by customizing ~valign-separator-row-style~.
+
 [[./table-single.png]]
