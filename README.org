@@ -4,16 +4,14 @@ This package provides visual alignment for Org and Markdown tables on GUI Emacs.
 
 To use this package, load it and run =M-x valign-mode RET=. And any Org tables in Org mode should be automatically aligned. If you want to align a table manually, run =M-x valign-table RET= on a table.
 
-You can choose from the two styles by customizing ~valign-separator-row-style~.
-
 #+ATTR_ORG: :width 300px
 [[./table-multi.png]]
-
-#+ATTR_ORG: :width 300px
-[[./table-single.png]]
 
 Features not yet supported:
  - org-ident. It uses line-prefix, and we don’t support it right now.
  - Hided links in markdown still occupy the full length of the link, because it uses character composition, which we don’t support now.
 
 If you are interested in adding support for them, look into ~valign--pixel-width-from-to~.
+
+You can use style below by customizing ~valign-separator-row-style~.
+[[./table-single.png]]
