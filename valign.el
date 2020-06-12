@@ -630,7 +630,9 @@ for the former, and 'multi-column for the latter."
 
 (defun valign--org-mode-hook ()
   "Valign hook function used by `org-mode'."
-  (jit-lock-register #'valign-initial-alignment))
+  ;; Our alignment function should run after font-lock, so it’s
+  ;; text properties are not mangled by that of font-lock.
+  (add-hook 'jit-lock-functions #'valign-initial-alignment 98 t))
 
 (defun valign-table-quite ()
   "Align table but don’t emit any errors."
