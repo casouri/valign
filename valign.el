@@ -625,11 +625,11 @@ for the former, and 'multi-column for the latter."
   (jit-lock-register #'valign-initial-alignment))
 
 (defun valign-table-quite ()
-  "Align table, but only if buffer is visible."
-  (when (and window-system
-             (valign--at-table-p)
-             (get-buffer-window (current-buffer)))
-    (valign-table)))
+  "Align table but don’t emit any errors."
+  (condition-case err
+      (valign-table)
+    ((debug error) (message "Valign error when aligning table: %s"
+                            (error-message-string err)))))
 
 (defun valign--markdown-mode-hook ()
   "Valign hook function used by `markdown-mode'."
