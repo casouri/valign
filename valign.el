@@ -599,10 +599,8 @@ for the former, and 'multi-column for the latter."
                              ;; 3.2) Align a right-aligned cell.
                              ('right (setq tab-width
                                            (- col-width cell-width))
-                                     (setq tab-start (point))
-                                     (valign--skip-space-forward)
                                      (valign--put-text-property
-                                      tab-start (point)
+                                      (point) (1+ (point))
                                       (+ pos tab-width))))))
                   ;; Update ‘pos’ for the next cell.
                   (setq pos (+ pos col-width bar-width ssw))
