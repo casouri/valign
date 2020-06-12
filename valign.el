@@ -622,9 +622,9 @@ for the former, and 'multi-column for the latter."
                                          valign-separator-row-style
                                          (reverse rev-list)))))
 
-    (valign-bad-cell (message (error-message-string err)))
-    (valign-not-gui (message (error-message-string err)))
-    (valign-not-on-table (message (error-message-string err)))))
+    ((debug valign-bad-cell) (message (error-message-string err)))
+    ((debug valign-not-gui) (message (error-message-string err)))
+    ((debug valign-not-on-table) (message (error-message-string err)))))
 
 ;;; Mode intergration
 
