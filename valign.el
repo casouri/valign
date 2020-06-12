@@ -206,7 +206,7 @@ But we don’t skip over chars with display property."
     (beginning-of-buffer nil)
     (end-of-buffer nil)))
 
-(defun valign--sperator-p ()
+(defun valign--separator-p ()
   "If the current cell is actually a separator.
 Assume point is after the left bar (“|”)."
   (or (eq (char-after) ?:) ;; Markdown tables.
@@ -265,7 +265,7 @@ Start from point, stop at LIMIT."
         ;;
         ;; Calculate this column’s pixel width, record it if it
         ;; is the largest one for this column.
-        (unless (valign--sperator-p)
+        (unless (valign--separator-p)
           (let ((oldmax (alist-get column-idx column-width-alist))
                 (cell-width (valign--cell-width)))
             (if (> cell-width (or oldmax 0))
@@ -273,7 +273,7 @@ Start from point, stop at LIMIT."
                       cell-width))))
         ;; Calculate the alignment if we are on the separator row
         ;; for markdown.
-        (when (valign--sperator-p)
+        (when (valign--separator-p)
           (setf (alist-get column-idx column-alignment-alist)
                 (valign--alignment-from-seperator)))))
     ;; Turn alist into a list.
