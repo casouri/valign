@@ -458,41 +458,28 @@ Assumes point is on the right bar or plus sign."
     (overlay-put ov 'valign t)))
 
 (cl-defmethod valign--align-separator-row
-  ((type (eql org)) (style (eql multi-column)) pos-list)
+  (type (style (eql multi-column)) pos-list)
   "Align the separator row in multi column style.
-TYPE must be 'org-mode, STYLE is 'multi-column.
+TYPE can be 'org-mode or 'markdown-mode, STYLE is 'multi-column.
 POS-LIST is a list of positions for each column’s right bar."
   (ignore type style)
   (let ((p (point))
-        (col-idx 0))
+        (col-idx 0)
+        (max-col (1- (length pos-list)))
+        (seperator-p (valign--separator-p)))
     (while (and (< (point) (point-max))
-                (search-forward "+" (line-end-position) t))
-      (valign--separator-row-add-overlay
-       p (1- (point))
-       (or (nth col-idx pos-list) 0))
+                (<= col-idx max-col)
+                (re-search-forward "[+|]" (line-end-position) t))
+      ;; Separator rows that has empty cells (|----|    |----|)
+      ;; is also possible.
+      (if seperator-p
+          (valign--separator-row-add-overlay
+           p (1- (point)) (nth col-idx pos-list))
+        (valign--put-text-property
+         p (1- (point)) (nth col-idx pos-list)))
       (cl-incf col-idx)
-      (setq p (point)))
-    ;; Last column
-    (when (search-forward "|" (line-end-position) t)
-      (valign--separator-row-add-overlay
-       p (1- (point))
-       (or (nth col-idx pos-list) 0)))))
-
-(cl-defmethod valign--align-separator-row
-  ((type (eql markdown)) (style (eql multi-column)) pos-list)
-  "Align the separator row in multi column style.
-TYPE must be 'markdown-mode, STYLE is 'multi-column.
-POS-LIST is a list of positions for each column’s right bar."
-  (ignore type style)
-  (let ((p (point))
-        (col-idx 0))
-    (while (and (< (point) (point-max))
-                (search-forward "|" (line-end-position) t))
-      (valign--separator-row-add-overlay
-       p (1- (point))
-       (or (nth col-idx pos-list) 0))
-      (cl-incf col-idx)
-      (setq p (point)))))
+      (setq p (point))
+      (setq seperator-p (valign--separator-p)))))
 
 (defun valign--guess-table-type ()
   "Return either 'org or 'markdown."
