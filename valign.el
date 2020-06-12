@@ -277,7 +277,9 @@ Start from point, stop at LIMIT."
         (unless (valign--separator-p)
           (let ((oldmax (alist-get column-idx column-width-alist))
                 (cell-width (valign--cell-width)))
-            (if (> cell-width (or oldmax 0))
+            ;; Why “=”: if cell-width is 0 and the whole column is 0,
+            ;; still record it.
+            (if (>= cell-width (or oldmax 0))
                 (setf (alist-get column-idx column-width-alist)
                       cell-width))))
         ;; Calculate the alignment if we are on the separator row
