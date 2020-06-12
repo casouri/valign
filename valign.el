@@ -91,16 +91,25 @@ TYPE must be 'markdown-mode.  Simply return HINT."
   "Return the pixel width of the cell at point.
 Assumes point is after the left bar (“|”).
 Return nil if not in a cell."
-  (let (start)
+  ;; We assumes:
+  ;; 1. Point is after the left bar (“|”).
+  ;; 2. Cell is delimited by either “|” or “+”.
+  ;; 3. There is at least one space on either side of the content,
+  ;;    unless the cell is empty.
+  ;; IOW: CELL      := <DELIM>(<EMPTY>|<NON-EMPTY>)<DELIM>
+  ;;      EMPTY     := <SPACE>+
+  ;;      NON-EMPTY := <SPACE>+<NON-SPACE>+<SPACE>+
+  ;;      DELIM     := | or +
+  (let ((start (point)))
     (save-excursion
       (valign--skip-space-forward)
-      (setq start (point))
-      (if (not (search-forward "|" nil t))
-          (signal 'valign-bad-cell nil)
-        ;; We are at the right “|”
-        (backward-char)
-        (valign--skip-space-backward)
-        (valign--pixel-width-from-to start (point))))))
+      (if (looking-at-p "[|+]")
+          0
+        (if (not (search-forward "|" nil t))
+            (signal 'valign-bad-cell nil)
+          ;; We are at the right “|”
+          (backward-char 2)
+          (valign--pixel-width-from-to (1+ start) (point)))))))
 
 ;; (defun valign--font-at (p)
 ;;   (find-font
