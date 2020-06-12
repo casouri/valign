@@ -43,8 +43,6 @@
 ;;; Backstage
 
 (define-error 'valign-bad-cell "Valign encountered a invalid table cell")
-(define-error 'valign-werid-alignment
-  "Valign expects one space between the cell’s content and either the left bar or the right bar, but this cell seems to violate that assumption")
 (define-error 'valign-not-gui "Valign only works in GUI environment")
 (define-error 'valign-not-on-table "Valign is asked to align a table, but the point is not on one")
 
@@ -63,7 +61,7 @@ TYPE must be 'org-mode.  HINT is not used."
         (if (looking-back
              "[^ ] |" (max (- (point) 3) (point-min)))
             'right
-          (signal 'valign-werid-alignment nil))))))
+          'left)))))
 
 (cl-defmethod valign--cell-alignment
   ((type (eql markdown)) hint)
@@ -614,7 +612,6 @@ for the former, and 'multi-column for the latter."
                                          (reverse rev-list)))))
 
     (valign-bad-cell (message (error-message-string err)))
-    (valign-werid-alignment (message (error-message-string err)))
     (valign-not-gui (message (error-message-string err)))
     (valign-not-on-table (message (error-message-string err)))))
 
