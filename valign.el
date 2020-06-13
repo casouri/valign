@@ -510,7 +510,7 @@ for the former, and 'multi-column for the latter."
   (interactive)
   (if (not window-system)
       (signal 'valign-not-gui nil))
-  (condition-case err
+  (condition-case nil
       (save-excursion
         (let (end column-width-list column-idx pos ssw bar-width
                   separator-row-point-list rev-list right-point
@@ -613,9 +613,7 @@ for the former, and 'multi-column for the latter."
                                          valign-separator-row-style
                                          (reverse rev-list)))))
 
-    ((debug valign-bad-cell) (message (error-message-string err)))
-    ((debug valign-not-gui) (message (error-message-string err)))
-    ((debug valign-not-on-table) (message (error-message-string err)))))
+    ((debug valign-bad-cell valign-not-gui valign-not-on-table) nil)))
 
 ;;; Mode intergration
 
