@@ -658,6 +658,20 @@ When they are fontified next time."
     (with-silent-modifications
       (put-text-property beg end 'valign-init nil))))
 
+(defun valign--force-window-update-advice (&optional object)
+  "Hook run after ‘force-window-update’ runs.
+OBJECT is the same as in ‘force-window-update’."
+  (cond ((null object)
+         (dolist (window (window-list))
+           (with-selected-window window
+             (valign--realign-on-refontification))))
+        ((window-live-p object)
+         (with-selected-window object
+           (valign--realign-on-refontification)))
+        ((or (bufferp object) (stringp object))
+         (with-current-buffer object
+           (valign--realign-on-refontification)))))
+
 (defun valign-reset-buffer ()
   "Remove alignment in the buffer."
   ;; TODO Use the new Emacs 27 function.
@@ -685,10 +699,11 @@ When they are fontified next time."
   :lighter valign-lighter
   (if (and valign-mode window-system)
       (progn
-        (add-hook 'org-mode-hook #'valign--org-mode-hook 90)
-        (add-hook 'markdown-mode-hook #'valign--markdown-mode-hook 90)
+        (add-hook 'org-mode-hook #'valign--org-mode-hook)
+        (add-hook 'markdown-mode-hook #'valign--markdown-mode-hook)
         (add-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
-        (advice-add 'org-table-align :after #'valign-table-quite)
+        (advice-add 'org-table-justify-field-maybe
+                    :after #'valign-table-quite)
         (advice-add 'org-toggle-inline-images
                     :after #'valign--force-align-buffer)
         (advice-add 'org-restart-font-lock
@@ -705,6 +720,8 @@ When they are fontified next time."
                     :before #'valign--org-flag-region-advice)
         (advice-add 'outline-flag-region
                     :before #'valign--org-flag-region-advice)
+        (advice-add 'text-scale-adjust
+                    :before #'valign--force-window-update-advice)
         ;; Force jit-lock to refontify (and thus realign) the buffer.
         (dolist (buf (buffer-list))
           ;; If the buffer is visible, realign immediately, if not,
@@ -731,7 +748,7 @@ When they are fontified next time."
     (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
     (advice-remove 'org-restart-font-lock #'valign--realign-on-refontification)
     (advice-remove 'visible-mode #'valign--realign-on-refontification)
-    (advice-remove 'org-table-align #'valign-table-quite)
+    (advice-remove 'org-table-justify-field-maybe #'valign-table-quite)
     (advice-remove 'markdown-table-align #'valign-table-quite)
     (advice-remove 'org-flag-region #'valign--org-flag-region-advice)
     (advice-remove 'outline-flag-region #'valign--org-flag-region-advice)
@@ -739,6 +756,8 @@ When they are fontified next time."
                    #'valign--realign-on-refontification)
     (advice-remove 'markdown-toggle-inline-images
                    #'valign--force-align-buffer)
+    (advice-remove 'text-scale-adjust
+                   #'valign--force-window-update-advice)
     (dolist (buf (buffer-list))
       (with-current-buffer buf
         (when (or (derived-mode-p 'org-mode)
