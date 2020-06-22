@@ -600,11 +600,21 @@ for the former, and 'multi-column for the latter."
 
 ;;; Mode intergration
 
-(defun valign--org-mode-hook ()
-  "Valign hook function used by `org-mode'."
+(defun valign--add-to-jit-lock ()
+  "Add valig hook to jit-lock."
   ;; Our alignment function should run after font-lock, so it’s
   ;; text properties are not mangled by that of font-lock.
-  (add-hook 'jit-lock-functions #'valign-initial-alignment 98 t))
+  (add-hook 'jit-lock-functions #'valign-initial-alignment 98 t)
+  (add-function :after (local 'font-lock-fontify-region)
+                #'valign-initial-alignment))
+
+(defun valign--remove-from-jit-lock ()
+  "Add valig hook to jit-lock."
+  ;; Our alignment function should run after font-lock, so it’s
+  ;; text properties are not mangled by that of font-lock.
+  (remove-hook 'jit-lock-functions #'valign-initial-alignment t)
+  (remove-function (local 'font-lock-fontify-region)
+                   #'valign-initial-alignment))
 
 (defun valign-table-quite ()
   "Align table but don’t emit any errors."
@@ -613,17 +623,11 @@ for the former, and 'multi-column for the latter."
     ((debug error) (message "Valign error when aligning table: %s"
                             (error-message-string err)))))
 
-(defun valign--markdown-mode-hook ()
-  "Valign hook function used by `markdown-mode'."
-  ;; We want our hook run after other markdown fontifications,
-  ;; because they mess up our alignment (which is not cool).
-  (add-hook 'jit-lock-functions #'valign-always-align 98 t))
-
 (defun valign--force-align-buffer (&rest _)
   "Forcefully realign every table in the buffer."
   (valign-initial-alignment (point-min) (point-max) t))
 
-(defun valign--realign-on-refontification (&rest _)
+(defun valign--align-buffer-on-fontification (&rest _)
   "Make sure text in the buffer are realigned.
 When they are fontified next time."
   (with-silent-modifications
@@ -640,20 +644,6 @@ When they are fontified next time."
              (text-property-any beg end 'invisible 'org-link))
     (with-silent-modifications
       (put-text-property beg end 'valign-init nil))))
-
-(defun valign--force-window-update-advice (&optional object)
-  "Hook run after ‘force-window-update’ runs.
-OBJECT is the same as in ‘force-window-update’."
-  (cond ((null object)
-         (dolist (window (window-list))
-           (with-selected-window window
-             (valign--realign-on-refontification))))
-        ((window-live-p object)
-         (with-selected-window object
-           (valign--realign-on-refontification)))
-        ((or (bufferp object) (stringp object))
-         (with-current-buffer object
-           (valign--realign-on-refontification)))))
 
 (defun valign-reset-buffer ()
   "Remove alignment in the buffer."
@@ -682,30 +672,29 @@ OBJECT is the same as in ‘force-window-update’."
   :lighter valign-lighter
   (if (and valign-mode window-system)
       (progn
-        (add-hook 'org-mode-hook #'valign--org-mode-hook)
-        (add-hook 'markdown-mode-hook #'valign--markdown-mode-hook)
+        ;; Init.
+        (dolist (hook '(org-mode-hook markdown-mode-hook))
+          (add-hook hook #'valign--add-to-jit-lock))
+        ;; Force align.
         (add-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
-        (advice-add 'org-table-justify-field-maybe
-                    :after #'valign-table-quite)
-        (advice-add 'org-toggle-inline-images
-                    :after #'valign--force-align-buffer)
-        (advice-add 'org-restart-font-lock
-                    :before #'valign--realign-on-refontification)
-        (advice-add 'visible-mode
-                    :before #'valign--realign-on-refontification)
-        ;; account for hide-link, show-math, and hide markup
-        (advice-add 'markdown-reload-extensions
-                    :before #'valign--realign-on-refontification)
-        (advice-add 'markdown-toggle-inline-images
-                    :after #'valign--force-align-buffer)
-        (advice-add 'markdown-table-align :after #'valign-table-quite)
-        (advice-add 'org-flag-region
-                    :before #'valign--org-flag-region-advice)
-        (advice-add 'outline-flag-region
-                    :before #'valign--org-flag-region-advice)
-        (advice-add 'text-scale-adjust
-                    :before #'valign--force-window-update-advice)
-        ;; Force jit-lock to refontify (and thus realign) the buffer.
+        ;; Sadly some functions refuse to work with
+        ;; `valign--align-buffer-on-fontification.'
+        (dolist (fn '(text-scale-adjust
+                      markdown-toggle-inline-images
+                      org-toggle-inline-images))
+          (advice-add fn :after #'valign--force-align-buffer))
+        ;; Align table.
+        (dolist (fn '(org-table-justify-field-maybe markdown-table-align))
+          (advice-add fn :after #'valign-table-quite))
+        ;; Realign with font lock change.
+        (dolist (fn '(org-restart-font-lock
+                      visible-mode
+                      markdown-reload-extensions))
+          (advice-add fn :before #'valign--align-buffer-on-fontification))
+        ;; Realign with font lock change.
+        (dolist (fn '(org-flag-region outline-flag-region))
+          (advice-add fn :before #'valign--org-flag-region-advice))
+        ;; Sync all buffers.
         (dolist (buf (buffer-list))
           ;; If the buffer is visible, realign immediately, if not,
           ;; realign when it becomes visible.
@@ -720,32 +709,30 @@ OBJECT is the same as in ‘force-window-update’."
                    (point-min) (point-max) 'fontified nil)
                   (put-text-property
                    (point-min) (point-max) 'valign-init nil))))
-            (cond ((derived-mode-p 'org-mode)
-                   (valign--org-mode-hook))
-                  ((derived-mode-p 'markdown-mode)
-                   (valign--markdown-mode-hook))))))
-    (remove-hook 'org-mode-hook #'valign--org-mode-hook)
-    (remove-hook 'markdown-mode-hook #'valign--markdown-mode-hook)
+            (valign--add-to-jit-lock))))
+    ;; Disable.
+    (dolist (hook '(org-mode-hook markdown-mode-hook))
+      (remove-hook hook #'valign--add-to-jit-lock))
     (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
-    
-    (advice-remove 'org-toggle-inline-images #'valign--force-align-buffer)
-    (advice-remove 'org-restart-font-lock #'valign--realign-on-refontification)
-    (advice-remove 'visible-mode #'valign--realign-on-refontification)
-    (advice-remove 'org-table-justify-field-maybe #'valign-table-quite)
-    (advice-remove 'markdown-table-align #'valign-table-quite)
-    (advice-remove 'org-flag-region #'valign--org-flag-region-advice)
-    (advice-remove 'outline-flag-region #'valign--org-flag-region-advice)
-    (advice-remove 'markdown-reload-extensions
-                   #'valign--realign-on-refontification)
-    (advice-remove 'markdown-toggle-inline-images
-                   #'valign--force-align-buffer)
-    (advice-remove 'text-scale-adjust
-                   #'valign--force-window-update-advice)
+    (dolist (fn '(text-scale-adjust
+                  markdown-toggle-inline-images
+                  org-toggle-inline-images))
+      (advice-add fn :after #'valign--force-align-buffer))
+    (dolist (fn '(org-table-justify-field-maybe markdown-table-align))
+      (advice-remove fn #'valign-table-quite))
+    (dolist (fn '(org-restart-font-lock
+                  visible-mode
+                  markdown-reload-extensions))
+      (advice-remove fn #'valign--align-buffer-on-fontification))
+    (dolist (fn '(org-flag-region outline-flag-region))
+      (advice-remove fn #'valign--org-flag-region-advice))
+    ;; Sync all buffers.
     (dolist (buf (buffer-list))
       (with-current-buffer buf
         (when (or (derived-mode-p 'org-mode)
                   (derived-mode-p 'markdown-mode))
-          (valign-reset-buffer))))))
+          (valign-reset-buffer)
+          (valign--remove-from-jit-lock))))))
 
 (provide 'valign)
 
