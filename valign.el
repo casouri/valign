@@ -118,6 +118,7 @@ Return nil if not in a cell."
 ;;                      nil
 ;;                      (char-after)))))
 
+;; Obsolete.
 (defun valign--tab-width (font)
   "Return the pixel width of a tab in FONT."
   ;; FIXME We have to over-estimate the pixel width of a tab.  Since
@@ -130,6 +131,7 @@ Return nil if not in a cell."
      ;; sometimes nil, someone should investigate.
      (aref (aref (font-get-glyphs font 0 1 " ") 0) 4)))
 
+;; Obsolete.
 (defun valign--glyph-width-at-point (&optional point)
   "Return the pixel width of the glyph at POINT.
 The buffer has to be visible.  If point is at an image, this
@@ -144,42 +146,19 @@ character’s glyph width."
       ;; it requires the buffer to be visible.
       (aref (aref (font-get-glyphs (font-at p) p (1+ p)) 0) 4))))
 
+;; We used to use a custom functions that calculates the pixel text
+;; width that doesn’t require a live window.  However that function
+;; has some limitations, including not working right with face remapping.
+;; With this function we can avoid some of them.  However we still can’t
+;; get the true tab width, see comment in ‘valgn--tab-width’ for more.
 (defun valign--pixel-width-from-to (from to)
   "Return the width of the glyphs from FROM (inclusive) to TO (exclusive).
-The buffer has to be visible.  FROM has to be less than TO.  Unlike
-‘valign--glyph-width-at-point’, this function can properly
-calculate images pixel width."
-  (let ((width 0))
-    (save-excursion
-      (goto-char from)
-      (while (< (point) to)
-        (let ((display (plist-get (text-properties-at (point))
-                                  'display)))
-          ;; 1) This is an overlay or text property image, add image
-          ;; width.
-          (cond ((and (setq ;; Overlay image?
-                       display (or (cl-loop for ov in (overlays-at (point) t)
-                                            if (overlay-get ov 'display)
-                                            return (overlay-get ov 'display)
-                                            finally return nil)
-                                   ;; Text property image?
-                                   (plist-get (text-properties-at (point))
-                                              'display)))
-                      (consp display)
-                      (eq (car display) 'image))
-                 (progn
-                   (setq width (+ width (car (image-size display t))))
-                   (goto-char
-                    (next-single-property-change (point) 'display nil to))))
-                ;; 2) Invisible text.  If text is hidden under ellipses,
-                ;; (outline fold) treat it as non-invisible.
-                ((eq (invisible-p (point)) t)
-                 (goto-char
-                  (next-single-property-change (point) 'invisible nil to)))
-                ;; 3) This is a normal character, add glyph width.
-                (t (setq width (+ width (valign--glyph-width-at-point)))
-                   (goto-char (1+ (point))))))))
-    width))
+The buffer has to be in a live window.  FROM has to be less than TO.
+Unlike ‘valign--glyph-width-at-point’, this function can properly
+calculate images pixel width.  Valign display properties must be
+cleaned before using this."
+  (car (window-text-pixel-size
+        (get-buffer-window (current-buffer)) from to)))
 
 (defun valign--skip-space-backward ()
   "Like (skip-chars-forward \" \").
@@ -385,14 +364,18 @@ white space stretching to XPOS, a pixel x position."
 Supposed to be called from jit-lock.
 Force align if FORCE non-nil."
   (when (or force (text-property-any beg end 'valign-init nil))
-    (save-excursion
-      (goto-char beg)
-      (while (and (search-forward "|" nil t)
-                  (< (point) end))
-        (valign-table-quite)
-        (valign--end-of-table))
-      (with-silent-modifications
-        (put-text-property beg (point) 'valign-init t))))
+    ;; Text sized can differ between frames, only use current frame.
+    ;; We only align when this buffer is in a live window, because we
+    ;; need ‘window-text-pixel-size’ to calculate text size.
+    (when (window-live-p (get-buffer-window nil (selected-frame)))
+      (save-excursion
+        (goto-char beg)
+        (while (and (search-forward "|" nil t)
+                    (< (point) end))
+          (valign-table-quite)
+          (valign--end-of-table))
+        (with-silent-modifications
+          (put-text-property beg (point) 'valign-init t)))))
   (cons 'jit-lock-bounds (cons beg end)))
 
 (defun valign-always-align (beg end)
@@ -525,6 +508,7 @@ for the former, and 'multi-column for the latter."
               (signal 'valign-not-on-table nil))
           (setq end (point))
           (valign--beginning-of-table)
+          (valign--clean-text-property (point) end)
           (setq info (valign--calculate-table-info end))
           (setq column-width-list
                 (valign-table-info-column-width-list info)
@@ -545,10 +529,11 @@ for the former, and 'multi-column for the latter."
                        (cell-width (valign--cell-width))
                        tab-width tab-start tab-end)
                   ;; single-space-width
-                  (unless ssw (setq ssw (valign--glyph-width-at-point)))
+                  (unless ssw (setq ssw (valign--pixel-width-from-to
+                                         (point) (1+ (point)))))
                   (unless bar-width (setq bar-width
-                                          (valign--glyph-width-at-point
-                                           (1- (point)))))
+                                          (valign--pixel-width-from-to
+                                           (1- (point)) (point))))
                   ;; Initialize some numbers when we are at a new
                   ;; line.  ‘pos’ is the pixel position of the
                   ;; current point, i.e., after the left bar.
@@ -560,8 +545,6 @@ for the former, and 'multi-column for the latter."
                     (setq at-sep-row (if (valign--separator-p) t nil))
                     (setq pos (valign--pixel-width-from-to
                                (line-beginning-position) (point))))
-                  ;; Clean up old tabs (i.e., stuff used for padding).
-                  (valign--clean-text-property (point) (1- right-point))
                   ;; Align cell.
                   (cond ((eq cell-width 0)
                          ;; 1) Empty cell.
