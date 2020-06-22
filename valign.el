@@ -108,8 +108,8 @@ Return nil if not in a cell."
         (if (not (search-forward "|" nil t))
             (signal 'valign-bad-cell nil)
           ;; We are at the right “|”
-          (backward-char 2)
-          (valign--pixel-width-from-to (1+ start) (point)))))))
+          (valign--pixel-width-from-to
+           (1+ start) (1- (match-beginning 0))))))))
 
 ;; (defun valign--font-at (p)
 ;;   (find-font
