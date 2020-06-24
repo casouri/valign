@@ -679,7 +679,8 @@ When they are fontified next time."
         (add-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
         ;; Sadly some functions refuse to work with
         ;; `valign--align-buffer-on-fontification.'
-        (dolist (fn '(text-scale-adjust
+        (dolist (fn '(text-scale-increase
+                      text-scale-decrease
                       markdown-toggle-inline-images
                       org-toggle-inline-images))
           (advice-add fn :after #'valign--force-align-buffer))
@@ -714,7 +715,8 @@ When they are fontified next time."
     (dolist (hook '(org-mode-hook markdown-mode-hook))
       (remove-hook hook #'valign--add-to-jit-lock))
     (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
-    (dolist (fn '(text-scale-adjust
+    (dolist (fn '(text-scale-increase
+                  text-scale-decrease
                   markdown-toggle-inline-images
                   org-toggle-inline-images))
       (advice-add fn :after #'valign--force-align-buffer))
