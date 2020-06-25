@@ -359,31 +359,6 @@ white space stretching to XPOS, a pixel x position."
           (with-silent-modifications
             (put-text-property p tab-end 'display nil)))))))
 
-(defun valign-initial-alignment (beg end &optional force)
-  "Perform initial alignment for tables between BEG and END.
-Supposed to be called from jit-lock.
-Force align if FORCE non-nil."
-  (when (or force (text-property-any beg end 'valign-init nil))
-    ;; Text sized can differ between frames, only use current frame.
-    ;; We only align when this buffer is in a live window, because we
-    ;; need ‘window-text-pixel-size’ to calculate text size.
-    (when (window-live-p (get-buffer-window nil (selected-frame)))
-      (save-excursion
-        (goto-char beg)
-        (while (and (search-forward "|" nil t)
-                    (< (point) end))
-          (valign-table-quite)
-          (valign--end-of-table))
-        (with-silent-modifications
-          (put-text-property beg (point) 'valign-init t)))))
-  (cons 'jit-lock-bounds (cons beg end)))
-
-(defun valign-always-align (beg end)
-  "Perform initial alignment for tables between BEG and END.
-Supposed to be called from jit-lock.  Unlike
-`valign-initial-ailgnment', always realign."
-  (valign-initial-alignment beg end t))
-
 (cl-defmethod valign--align-separator-row
   (type (style (eql single-column)) pos-list)
   "Align the separator row (|---+---|) as “|---------|”.
@@ -496,13 +471,12 @@ for the former, and 'multi-column for the latter."
   (condition-case nil
       (save-excursion
         (let (end column-width-list column-idx pos ssw bar-width
-                  separator-row-point-list rev-list right-point
+                  separator-row-point-list rev-list
                   column-alignment-list info at-sep-row)
           ;; ‘separator-row-point-list’ marks the point for each
           ;; separator-row, so we can later come back and align them.
           ;; ‘rev-list’ is the reverse list of right positions of each
-          ;; separator row cell.  ‘right-point’ marks point before the
-          ;; right bar for each cell.  ‘at-sep-row’ t means we are at
+          ;; separator row cell.  ‘at-sep-row’ t means we are at
           ;; a separator row.
           (if (not (valign--end-of-table))
               (signal 'valign-not-on-table nil))
@@ -519,8 +493,7 @@ for the former, and 'multi-column for the latter."
             (save-excursion
               ;; Check there is a right bar.
               (when (save-excursion
-                      (setq right-point
-                            (search-forward "|" (line-end-position) t)))
+                      (search-forward "|" (line-end-position) t))
                 ;; We are after the left bar (“|”).
                 ;; Start aligning this cell.
                 ;;      Pixel width of the column
@@ -600,47 +573,47 @@ for the former, and 'multi-column for the latter."
 
 ;;; Mode intergration
 
-(defun valign--add-to-jit-lock ()
-  "Add valig hook to jit-lock."
-  ;; Our alignment function should run after font-lock, so it’s
-  ;; text properties are not mangled by that of font-lock.
-  (add-hook 'jit-lock-functions #'valign-initial-alignment 98 t)
-  (add-function :after (local 'font-lock-fontify-region)
-                #'valign-initial-alignment))
-
-(defun valign--remove-from-jit-lock ()
-  "Add valig hook to jit-lock."
-  ;; Our alignment function should run after font-lock, so it’s
-  ;; text properties are not mangled by that of font-lock.
-  (remove-hook 'jit-lock-functions #'valign-initial-alignment t)
-  (remove-function (local 'font-lock-fontify-region)
-                   #'valign-initial-alignment))
-
-(defun valign-table-quite ()
+(defun valign-table-quiet ()
   "Align table but don’t emit any errors."
   (condition-case err
       (valign-table)
     ((debug error) (message "Valign error when aligning table: %s"
                             (error-message-string err)))))
 
-(defun valign--force-align-buffer (&rest _)
-  "Forcefully realign every table in the buffer."
-  (valign-initial-alignment (point-min) (point-max) t))
+(defun valign-region (&optional beg end)
+  "Align tables between BEG and END.
+Supposed to be called from jit-lock.
+Force align if FORCE non-nil."
+  ;; Text sized can differ between frames, only use current frame.
+  ;; We only align when this buffer is in a live window, because we
+  ;; need ‘window-text-pixel-size’ to calculate text size.
+  (let ((beg (or beg (point-min)))
+        (end (or end (point-max))))
+    (when (window-live-p (get-buffer-window nil (selected-frame)))
+      (save-excursion
+        (goto-char beg)
+        (while (and (search-forward "|" nil t)
+                    (< (point) end))
+          (valign-table-quiet)
+          (valign--end-of-table))
+        (with-silent-modifications
+          (put-text-property beg (point) 'valign-init t)))))
+  (cons 'jit-lock-bounds (cons beg end)))
 
-(defun valign--align-buffer-on-fontification (&rest _)
-  "Make sure text in the buffer are realigned.
-When they are fontified next time."
-  (with-silent-modifications
-    (put-text-property (point-min) (point-max) 'valign-init nil)))
+(defvar valign-mode)
+(defun valign--buffer-advice (&rest _)
+  "Realign whole buffer."
+  (when valign-mode (valign-region)))
 
 ;; When an org link is in an outline fold, it’s full length
 ;; is used, when the subtree is unveiled, org link only shows
 ;; part of it’s text, so we need to re-align.  This function
 ;; runs before the region is flagged. When the text
 ;; is shown, jit-lock will make valign realign the text.
-(defun valign--org-flag-region-advice (beg end flag &optional _)
-  "Valign hook, realign table between BEG and END."
-  (when (and (not flag)
+(defun valign--flag-region-advice (beg end flag &optional _)
+  "Valign hook, realign table between BEG and END.
+FLAG is the same as in ‘org-flag-region’."
+  (when (and valign-mode (not flag)
              (text-property-any beg end 'invisible 'org-link))
     (with-silent-modifications
       (put-text-property beg end 'valign-init nil))))
@@ -662,79 +635,35 @@ When they are fontified next time."
       (when (overlay-get ov 'valign)
         (delete-overlay ov)))))
 
+(defun valign-remove-advice ()
+  "Remove advices added by valign."
+  (interactive)
+  (dolist (fn '(text-scale-increase
+                text-scale-decrease
+                org-agenda-finalize-hook))
+    (advice-remove fn #'valign--buffer-advice))
+  (dolist (fn '(org-flag-region outline-flag-region))
+    (advice-remove fn #'valign--flag-region-advice)))
+
 ;;; Userland
 
 (define-minor-mode valign-mode
   "Visually align Org tables."
-  :global t
   :require 'valign
   :group 'valign
   :lighter valign-lighter
   (if (and valign-mode window-system)
       (progn
-        ;; Init.
-        (dolist (hook '(org-mode-hook markdown-mode-hook))
-          (add-hook hook #'valign--add-to-jit-lock))
-        ;; Force align.
-        (add-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
-        ;; Sadly some functions refuse to work with
-        ;; `valign--align-buffer-on-fontification.'
+        (add-hook 'jit-lock-functions #'valign-region 98 t)
         (dolist (fn '(text-scale-increase
                       text-scale-decrease
-                      markdown-toggle-inline-images
-                      org-toggle-inline-images))
-          (advice-add fn :after #'valign--force-align-buffer))
-        ;; Align table.
-        (dolist (fn '(org-table-justify-field-maybe markdown-table-align))
-          (advice-add fn :after #'valign-table-quite))
-        ;; Realign with font lock change.
-        (dolist (fn '(org-restart-font-lock
-                      visible-mode
-                      markdown-reload-extensions))
-          (advice-add fn :before #'valign--align-buffer-on-fontification))
-        ;; Realign with font lock change.
+                      org-agenda-finalize-hook))
+          (advice-add fn :after #'valign--buffer-advice))
         (dolist (fn '(org-flag-region outline-flag-region))
-          (advice-add fn :before #'valign--org-flag-region-advice))
-        ;; Sync all buffers.
-        (dolist (buf (buffer-list))
-          ;; If the buffer is visible, realign immediately, if not,
-          ;; realign when it becomes visible.
-          (with-current-buffer buf
-            (when (or (derived-mode-p 'org-mode)
-                      (derived-mode-p 'markdown-mode))
-              (if (get-buffer-window buf t)
-                  (with-selected-window (get-buffer-window buf t)
-                    (valign-initial-alignment (point-min) (point-max) t))
-                (with-silent-modifications
-                  (put-text-property
-                   (point-min) (point-max) 'fontified nil)
-                  (put-text-property
-                   (point-min) (point-max) 'valign-init nil))))
-            (valign--add-to-jit-lock))))
-    ;; Disable.
-    (dolist (hook '(org-mode-hook markdown-mode-hook))
-      (remove-hook hook #'valign--add-to-jit-lock))
-    (remove-hook 'org-agenda-finalize-hook #'valign--force-align-buffer)
-    (dolist (fn '(text-scale-increase
-                  text-scale-decrease
-                  markdown-toggle-inline-images
-                  org-toggle-inline-images))
-      (advice-add fn :after #'valign--force-align-buffer))
-    (dolist (fn '(org-table-justify-field-maybe markdown-table-align))
-      (advice-remove fn #'valign-table-quite))
-    (dolist (fn '(org-restart-font-lock
-                  visible-mode
-                  markdown-reload-extensions))
-      (advice-remove fn #'valign--align-buffer-on-fontification))
-    (dolist (fn '(org-flag-region outline-flag-region))
-      (advice-remove fn #'valign--org-flag-region-advice))
-    ;; Sync all buffers.
-    (dolist (buf (buffer-list))
-      (with-current-buffer buf
-        (when (or (derived-mode-p 'org-mode)
-                  (derived-mode-p 'markdown-mode))
-          (valign-reset-buffer)
-          (valign--remove-from-jit-lock))))))
+          (advice-add fn :before #'valign--flag-region-advice))
+        (jit-lock-refontify))
+    (remove-hook 'jit-lock-functions #'valign-region t)
+    (valign-reset-buffer)))
 
 (provide 'valign)
 
