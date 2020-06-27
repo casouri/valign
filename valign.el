@@ -618,6 +618,15 @@ FLAG is the same as in ‘org-flag-region’."
     (with-silent-modifications
       (put-text-property beg end 'valign-init nil))))
 
+(defun valign--tab-advice (&rest _)
+  "Force realign after tab so user can force realign."
+  (when valign-mode
+    (save-excursion
+      (when-let ((beg (valign--beginning-of-table))
+                 (end (valign--end-of-table)))
+        (with-silent-modifications
+          (put-text-property beg end 'fontified nil))))))
+
 (defun valign-reset-buffer ()
   "Remove alignment in the buffer."
   ;; TODO Use the new Emacs 27 function.
@@ -638,6 +647,9 @@ FLAG is the same as in ‘org-flag-region’."
 (defun valign-remove-advice ()
   "Remove advices added by valign."
   (interactive)
+  (dolist (fn '(org-table--align-field
+                markdown-table-align))
+    (advice-remove fn #'valign--tab-advice))
   (dolist (fn '(text-scale-increase
                 text-scale-decrease
                 org-agenda-finalize-hook))
@@ -655,9 +667,13 @@ FLAG is the same as in ‘org-flag-region’."
   (if (and valign-mode window-system)
       (progn
         (add-hook 'jit-lock-functions #'valign-region 98 t)
+        (dolist (fn '(org-table--align-field
+                      markdown-table-align))
+          (advice-add fn :before #'valign--tab-advice))
         (dolist (fn '(text-scale-increase
                       text-scale-decrease
-                      org-agenda-finalize-hook))
+                      org-agenda-finalize-hook
+                      org-toggle-inline-images))
           (advice-add fn :after #'valign--buffer-advice))
         (dolist (fn '(org-flag-region outline-flag-region))
           (advice-add fn :before #'valign--flag-region-advice))
