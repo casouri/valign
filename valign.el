@@ -327,6 +327,23 @@ white space stretching to XPOS, a pixel x position."
      beg end 'display
      `(space :align-to (,xpos)))))
 
+(defvar valign-fancy-bar)
+(defun valign--maybe-render-bar (point)
+  "Make the character at POINT a full hegiht bar.
+But only if `valign-fancy-bar' is non-nil."
+  (when valign-fancy-bar
+    (valign--render-bar point)))
+
+(defun valign--render-bar (point)
+  "Make the character at POINT a full hegiht bar."
+  (with-silent-modifications
+    (put-text-property
+     point (1+ point) 'display '(space :width (1)))
+    (put-text-property
+     point (1+ point) 'face '(:inverse-video t))
+    (put-text-property
+     point (1+ point) 'font-lock-face '(:inverse-video t))))
+
 (defun valign--clean-text-property (beg end)
   "Clean up the display text property between BEG and END."
   ;; TODO ‘text-property-search-forward’ is Emacs 27 feature.
@@ -372,7 +389,9 @@ right bar’s position."
         (total-width (car (last pos-list))))
     (when (search-forward "|" nil t)
       (with-silent-modifications
-        (valign--put-text-property p (1- (point)) total-width))
+        (valign--put-text-property p (1- (point)) total-width)
+        ;; Render the right bar.
+        (valign--maybe-render-bar (1- (point))))
       ;; Why do we have to add an overlay? Because text property
       ;; doens’t work. First, font-lock overwrites what ever face
       ;; property you add; second, even if you are sneaky and added a
@@ -391,9 +410,12 @@ Cell ranges from BEG to END, the pixel position RIGHT-POS marks
 the position for the right bar (“|”).
 Assumes point is on the right bar or plus sign."
   ;; Make “+” look like “|”
-  (when (eq (char-after end) ?+)
-    (with-silent-modifications
-      (put-text-property end (1+ end) 'display "|")))
+  (if valign-fancy-bar
+      ;; Render the right bar.
+      (valign--render-bar end)
+    (when (eq (char-after end) ?+)
+      (with-silent-modifications
+        (put-text-property end (1+ end) 'display "|"))))
   ;; Markdown row
   (when (eq (char-after beg) ?:)
     (setq beg (1+ beg)))
@@ -429,7 +451,7 @@ POS-LIST is a list of positions for each column’s right bar."
                 (<= col-idx max-col)
                 (re-search-forward "[+|]" (line-end-position) t))
       ;; Separator rows that has empty cells (|----|    |----|)
-      ;; is also possible.
+      ;; is also possible.  `seperator-p' is t only for |----|.
       (if seperator-p
           (valign--separator-row-add-overlay
            p (1- (point)) (nth col-idx pos-list))
@@ -463,6 +485,15 @@ for the former, and 'multi-column for the latter."
           (const :tag "A single column" single-column))
   :group 'valign)
 
+(defcustom valign-fancy-bar nil
+  "Non-nil means to render bar as a full-height line.
+You need to restart valign mode or realign tables for this
+setting to take effect."
+  :type '(choice
+          (const :tag "Enable fancy bar" t)
+          (const :tag "Disable fancy bar" nil))
+  :group 'valign)
+
 (defun valign-table ()
   "Visually align the table at point."
   (interactive)
@@ -472,7 +503,7 @@ for the former, and 'multi-column for the latter."
       (save-excursion
         (let (end column-width-list column-idx pos ssw bar-width
                   separator-row-point-list rev-list
-                  column-alignment-list info at-sep-row)
+                  column-alignment-list info at-sep-row right-bar-pos)
           ;; ‘separator-row-point-list’ marks the point for each
           ;; separator-row, so we can later come back and align them.
           ;; ‘rev-list’ is the reverse list of right positions of each
@@ -493,7 +524,11 @@ for the former, and 'multi-column for the latter."
             (save-excursion
               ;; Check there is a right bar.
               (when (save-excursion
-                      (search-forward "|" (line-end-position) t))
+                      (search-forward "|" (line-end-position) t)
+                      (setq right-bar-pos (match-beginning 0)))
+                ;; Can’t put this in the save-excursion, donno why.
+                ;; Render the right bar of each cell.
+                (valign--maybe-render-bar right-bar-pos)
                 ;; We are after the left bar (“|”).
                 ;; Start aligning this cell.
                 ;;      Pixel width of the column
@@ -513,6 +548,8 @@ for the former, and 'multi-column for the latter."
                   (when (eq column-idx 0)
                     (when (valign--separator-p)
                       (push (point) separator-row-point-list))
+                    ;; Render the first bar of the line.
+                    (valign--maybe-render-bar (1- (point)))
                     (unless (valign--separator-p)
                       (setq rev-list nil))
                     (setq at-sep-row (if (valign--separator-p) t nil))
@@ -639,6 +676,10 @@ FLAG is the same as in ‘org-flag-region’."
         (when (and (consp display)
                    (eq (car display) 'space))
           (put-text-property pp p 'display nil))))
+    ;; Remove fancy bars.
+    (put-text-property (point-min) (point-max) 'face nil)
+    (put-text-property (point-min) (point-max) 'font-lock-face nil)
+    (jit-lock-refontify)
     ;; Remove overlays.
     (dolist (ov (overlays-in (point-min) (point-max)))
       (when (overlay-get ov 'valign)
