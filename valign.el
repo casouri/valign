@@ -475,11 +475,9 @@ POS-LIST is a list of positions for each column’s right bar."
   "The style of the separator row of a table.
 Valign can render it as “|-----------|”
 or as “|-----|-----|”.  Set this option to 'single-column
-for the former, and 'multi-column for the latter."
-  ;; Restart valign-mode if on.
-  :set (lambda (var val) (set-default var val)
-         (when (bound-and-true-p valign-mode)
-           (valign-mode -1) (valign-mode)))
+for the former, and 'multi-column for the latter.
+You need to restart valign mode or realign tables for this
+setting to take effect."
   :type '(choice
           (const :tag "Multiple columns" multi-column)
           (const :tag "A single column" single-column))
