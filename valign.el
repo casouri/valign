@@ -327,6 +327,14 @@ white space stretching to XPOS, a pixel x position."
      beg end 'display
      `(space :align-to (,xpos)))))
 
+(defun valign--table-face ()
+  "Return the table face for this buffer."
+  (cond ((derived-mode-p 'org-mode)
+         'org-table)
+        ((derived-mode-p 'markdown)
+         'markdown-table-face)
+        (t 'default)))
+
 (defvar valign-fancy-bar)
 (defun valign--maybe-render-bar (point)
   "Make the character at POINT a full hegiht bar.
@@ -339,10 +347,14 @@ But only if `valign-fancy-bar' is non-nil."
   (with-silent-modifications
     (put-text-property
      point (1+ point) 'display '(space :width (1)))
-    (put-text-property
-     point (1+ point) 'face '(:inverse-video t))
-    (put-text-property
-     point (1+ point) 'font-lock-face '(:inverse-video t))))
+    ;; We can’t just use :inverse-video because people
+    ;; uses different color for their tables, fine.
+    (let* ((inherit (valign--table-face))
+           (fg (face-attribute inherit :foreground nil 'default)))
+      (put-text-property point (1+ point) 'face
+                         `(:background ,fg :inherit ,inherit))
+      (put-text-property point (1+ point) 'font-lock-face
+                         `(:background ,fg :inherit ,inherit)))))
 
 (defun valign--clean-text-property (beg end)
   "Clean up the display text property between BEG and END."
@@ -361,6 +373,7 @@ But only if `valign-fancy-bar' is non-nil."
               (put-text-property (prop-match-beginning match)
                                  (prop-match-end match)
                                  'display nil)))))
+    ;; Before Emacs 27.
     (let (display tab-end (p beg) last-p)
       (while (not (eq p last-p))
         (setq last-p p
@@ -392,17 +405,12 @@ right bar’s position."
         (valign--put-text-property p (1- (point)) total-width)
         ;; Render the right bar.
         (valign--maybe-render-bar (1- (point))))
-      ;; Why do we have to add an overlay? Because text property
-      ;; doens’t work. First, font-lock overwrites what ever face
-      ;; property you add; second, even if you are sneaky and added a
-      ;; font-lock-face property, it is overwritten by the face
-      ;; property (org-table, in this case).
-      (dolist (ov (overlays-in p (1- (point))))
-        (if (overlay-get ov 'valign)
-            (delete-overlay ov)))
-      (let ((ov (make-overlay p (1- (point)))))
-        (overlay-put ov 'face '(:strike-through t))
-        (overlay-put ov 'valign t)))))
+      ;; Put strike-through.
+      (let ((inherit (valign--table-face)))
+        (put-text-property p (1- (point)) 'face
+                           `(:strike-through t :inherit ,inherit))
+        (put-text-property p (1- (point)) 'font-lock-face
+                           `(:strike-through t :inherit ,inherit))))))
 
 (defun valign--separator-row-add-overlay (beg end right-pos)
   "Add overlay to a separator row’s “cell”.
@@ -425,17 +433,12 @@ Assumes point is on the right bar or plus sign."
                        (valign--glyph-width-at-point (1- end)))))
   ;; End of Markdown
   (valign--put-text-property beg end right-pos)
-  ;; Why do we have to add an overlay? Because text property
-  ;; doens’t work. First, font-lock overwrites what ever face
-  ;; property you add; second, even if you are sneaky and added a
-  ;; font-lock-face property, it is overwritten by the face
-  ;; property (org-table, in this case).
-  (dolist (ov (overlays-in beg end))
-    (if (overlay-get ov 'valign)
-        (delete-overlay ov)))
-  (let ((ov (make-overlay beg end)))
-    (overlay-put ov 'face '(:strike-through t))
-    (overlay-put ov 'valign t)))
+  ;; Put strike-through.
+  (let ((inherit (valign--table-face)))
+    (put-text-property beg end 'face
+                       `(:strike-through t :inherit ,inherit))
+    (put-text-property beg end 'font-lock-face
+                       `(:strike-through t :inherit ,inherit))))
 
 (cl-defmethod valign--align-separator-row
   (type (style (eql multi-column)) pos-list)
@@ -667,21 +670,11 @@ FLAG is the same as in ‘org-flag-region’."
   ;; TODO Use the new Emacs 27 function.
   ;; Remove text properties
   (with-silent-modifications
-    (let ((p (point-min)) (pp (point-min)) display)
-      (while (< p (point-max))
-        (setq display (plist-get (text-properties-at p) 'display))
-        (setq p (next-single-char-property-change p 'display))
-        (when (and (consp display)
-                   (eq (car display) 'space))
-          (put-text-property pp p 'display nil))))
-    ;; Remove fancy bars.
+    (valign--clean-text-property (point-min) (point-max))
+    ;; Remove fancy bar’s text properties.
     (put-text-property (point-min) (point-max) 'face nil)
     (put-text-property (point-min) (point-max) 'font-lock-face nil)
-    (jit-lock-refontify)
-    ;; Remove overlays.
-    (dolist (ov (overlays-in (point-min) (point-max)))
-      (when (overlay-get ov 'valign)
-        (delete-overlay ov)))))
+    (jit-lock-refontify)))
 
 (defun valign-remove-advice ()
   "Remove advices added by valign."
