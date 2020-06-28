@@ -331,7 +331,7 @@ white space stretching to XPOS, a pixel x position."
   "Return the table face for this buffer."
   (cond ((derived-mode-p 'org-mode)
          'org-table)
-        ((derived-mode-p 'markdown)
+        ((derived-mode-p 'markdown-mode)
          'markdown-table-face)
         (t 'default)))
 
