@@ -287,36 +287,22 @@ Start from point, stop at LIMIT."
 
 (defun valign--beginning-of-table ()
   "Go backward to the beginning of the table at point.
-Assumes point is on a table.  Return nil if failed, point
-otherwise."
+Assumes point is on a table."
   (beginning-of-line)
-  (if (not (looking-at "[ \t]*|")) nil
-    (condition-case nil
-        (while (looking-at "[ \t]*|")
-          (search-backward "\n")
-          (beginning-of-line))
-      (search-failed nil))
-    (unless (looking-at "[ \t]*|")
-      (forward-line 1)
+  (let ((p (point)))
+    (while (looking-at "[ \t]*|")
+      (setq p (point))
+      (forward-line -1)
       (beginning-of-line))
-    (point)))
+    (goto-char p)))
 
 (defun valign--end-of-table ()
   "Go forward to the end of the table at point.
-Assumes point is on a table.  Return nil if failed, point
-otherwise."
-  (let ((p (point)))
-    (beginning-of-line)
-    (if (not (looking-at "[ \t]*|"))
-        (progn (goto-char p) nil)
-      (condition-case nil
-          (while (looking-at "[ \t]*|")
-            ;; Each iteration the point is at BOL.
-            (search-forward "\n" nil))
-        (search-failed nil))
-      ;; Point at the line after the last line of the table.
-      (backward-char)
-      (point))))
+Assumes point is on a table."
+  (end-of-line)
+  (while (looking-at "\n[ \t]*|")
+    (forward-line)
+    (end-of-line)))
 
 (defun valign--put-text-property (beg end xpos)
   "Put text property on text from BEG to END.
@@ -510,8 +496,9 @@ setting to take effect."
           ;; ‘rev-list’ is the reverse list of right positions of each
           ;; separator row cell.  ‘at-sep-row’ t means we are at
           ;; a separator row.
-          (if (not (valign--end-of-table))
+          (if (not (valign--at-table-p))
               (signal 'valign-not-on-table nil))
+          (valign--end-of-table)
           (setq end (point))
           (valign--beginning-of-table)
           (valign--clean-text-property (point) end)
@@ -660,8 +647,9 @@ FLAG is the same as in ‘org-flag-region’."
   "Force realign after tab so user can force realign."
   (when valign-mode
     (save-excursion
-      (when-let ((beg (valign--beginning-of-table))
-                 (end (valign--end-of-table)))
+      (when-let ((on-table (valign--at-table-p))
+                 (beg (progn (valign--beginning-of-table) (point)))
+                 (end (progn (valign--end-of-table) (point))))
         (with-silent-modifications
           (put-text-property beg end 'fontified nil))))))
 
