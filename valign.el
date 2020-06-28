@@ -290,10 +290,13 @@ Start from point, stop at LIMIT."
 Assumes point is on a table."
   (beginning-of-line)
   (let ((p (point)))
-    (while (looking-at "[ \t]*|")
-      (setq p (point))
-      (forward-line -1)
-      (beginning-of-line))
+    (catch 'abort
+      (while (looking-at "[ \t]*|")
+        (setq p (point))
+        (if (eq (point) (point-min))
+            (throw 'abort nil))
+        (forward-line -1)
+        (beginning-of-line)))
     (goto-char p)))
 
 (defun valign--end-of-table ()
