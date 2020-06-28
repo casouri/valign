@@ -638,10 +638,8 @@ Force align if FORCE non-nil."
 (defun valign--flag-region-advice (beg end flag &optional _)
   "Valign hook, realign table between BEG and END.
 FLAG is the same as in ‘org-flag-region’."
-  (when (and valign-mode (not flag)
-             (text-property-any beg end 'invisible 'org-link))
-    (with-silent-modifications
-      (put-text-property beg end 'valign-init nil))))
+  (when (and valign-mode (not flag))
+    (valign-region beg end)))
 
 (defun valign--tab-advice (&rest _)
   "Force realign after tab so user can force realign."
@@ -696,7 +694,7 @@ FLAG is the same as in ‘org-flag-region’."
                       org-toggle-inline-images))
           (advice-add fn :after #'valign--buffer-advice))
         (dolist (fn '(org-flag-region outline-flag-region))
-          (advice-add fn :before #'valign--flag-region-advice))
+          (advice-add fn :after #'valign--flag-region-advice))
         (jit-lock-refontify))
     (remove-hook 'jit-lock-functions #'valign-region t)
     (valign-reset-buffer)))
