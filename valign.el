@@ -335,11 +335,30 @@ But only if `valign-fancy-bar' is non-nil."
   (when valign-fancy-bar
     (valign--render-bar point)))
 
+(defun valign--fancy-bar-cursor-fn (window prev-pos action)
+  "Run when point enters or left a fancy bar.
+Because the bar is so thin, the cursor disappears in it.  We
+expands the bar so the cursor is visible. 'cusor-intangible
+doesn’t work because it prohibits you to put the cursor at BOL.
+
+WINDOW is just window, PREV-POS is the previous point of cursor
+before event, ACTION is either 'entered or 'left."
+  (ignore window)
+  (with-silent-modifications
+    (pcase action
+      ('entered (put-text-property (point) (1+ (point))
+                                   'display " "))
+      ('left (put-text-property prev-pos (1+ prev-pos)
+                                'display '(space :width (1)))))))
+
 (defun valign--render-bar (point)
   "Make the character at POINT a full hegiht bar."
   (with-silent-modifications
     (put-text-property
      point (1+ point) 'display '(space :width (1)))
+    (put-text-property point (1+ point)
+                       'cursor-sensor-functions
+                       '(valign--fancy-bar-cursor-fn))
     ;; We can’t just use :inverse-video because people
     ;; uses different color for their tables, fine.
     (let* ((inherit (valign--table-face))
@@ -351,6 +370,7 @@ But only if `valign-fancy-bar' is non-nil."
 
 (defun valign--clean-text-property (beg end)
   "Clean up the display text property between BEG and END."
+  (put-text-property beg end 'cursor-sensor-functions nil)
   ;; TODO ‘text-property-search-forward’ is Emacs 27 feature.
   (if (boundp 'text-property-search-forward)
       (save-excursion
@@ -481,8 +501,7 @@ setting to take effect."
 
 (defcustom valign-fancy-bar nil
   "Non-nil means to render bar as a full-height line.
-You need to restart valign mode or realign tables for this
-setting to take effect."
+You need to restart valign mode for this setting to take effect."
   :type '(choice
           (const :tag "Enable fancy bar" t)
           (const :tag "Disable fancy bar" nil))
@@ -702,9 +721,11 @@ FLAG is the same as in ‘org-flag-region’."
           (advice-add fn :after #'valign--buffer-advice))
         (dolist (fn '(org-flag-region outline-flag-region))
           (advice-add fn :after #'valign--flag-region-advice))
+        (if valign-fancy-bar (cursor-sensor-mode))
         (jit-lock-refontify))
     (remove-hook 'jit-lock-functions #'valign-region t)
-    (valign-reset-buffer)))
+    (valign-reset-buffer)
+    (cursor-sensor-mode -1)))
 
 (provide 'valign)
 
