@@ -103,7 +103,7 @@ Return nil if not in a cell."
   (let ((start (point)))
     (save-excursion
       (valign--skip-space-forward)
-      (if (looking-at-p "[|+]")
+      (if (looking-at-p "[|]")
           0
         (if (not (search-forward "|" nil t))
             (signal 'valign-bad-cell nil)
