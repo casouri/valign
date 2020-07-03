@@ -157,8 +157,12 @@ The buffer has to be in a live window.  FROM has to be less than TO.
 Unlike ‘valign--glyph-width-at-point’, this function can properly
 calculate images pixel width.  Valign display properties must be
 cleaned before using this."
-  (car (window-text-pixel-size
-        (get-buffer-window (current-buffer)) from to)))
+  (- (car (window-text-pixel-size
+           (get-buffer-window (current-buffer)) from to))
+     ;; FIXME: Workaround.
+     (if (bound-and-true-p display-line-numbers-mode)
+         (line-number-display-width 'pixel)
+       0)))
 
 (defun valign--skip-space-backward ()
   "Like (skip-chars-forward \" \").
