@@ -370,7 +370,8 @@ before event, ACTION is either 'entered or 'left."
 
 (defun valign--clean-text-property (beg end)
   "Clean up the display text property between BEG and END."
-  (put-text-property beg end 'cursor-sensor-functions nil)
+  (with-silent-modifications
+    (put-text-property beg end 'cursor-sensor-functions nil))
   ;; TODO ‘text-property-search-forward’ is Emacs 27 feature.
   (if (boundp 'text-property-search-forward)
       (save-excursion
@@ -414,16 +415,16 @@ right bar’s position."
         ;; Position of the right-most bar.
         (total-width (car (last pos-list))))
     (when (search-forward "|" nil t)
-      (with-silent-modifications
-        (valign--put-text-property p (1- (point)) total-width)
-        ;; Render the right bar.
-        (valign--maybe-render-bar (1- (point))))
+      (valign--put-text-property p (1- (point)) total-width)
+      ;; Render the right bar.
+      (valign--maybe-render-bar (1- (point)))
       ;; Put strike-through.
-      (let ((inherit (valign--table-face)))
-        (put-text-property p (1- (point)) 'face
-                           `(:strike-through t :inherit ,inherit))
-        (put-text-property p (1- (point)) 'font-lock-face
-                           `(:strike-through t :inherit ,inherit))))))
+      (with-silent-modifications
+        (let ((inherit (valign--table-face)))
+          (put-text-property p (1- (point)) 'face
+                             `(:strike-through t :inherit ,inherit))
+          (put-text-property p (1- (point)) 'font-lock-face
+                             `(:strike-through t :inherit ,inherit)))))))
 
 (defun valign--separator-row-add-overlay (beg end right-pos)
   "Add overlay to a separator row’s “cell”.
@@ -447,11 +448,12 @@ Assumes point is on the right bar or plus sign."
   ;; End of Markdown
   (valign--put-text-property beg end right-pos)
   ;; Put strike-through.
-  (let ((inherit (valign--table-face)))
-    (put-text-property beg end 'face
-                       `(:strike-through t :inherit ,inherit))
-    (put-text-property beg end 'font-lock-face
-                       `(:strike-through t :inherit ,inherit))))
+  (with-silent-modifications
+    (let ((inherit (valign--table-face)))
+      (put-text-property beg end 'face
+                         `(:strike-through t :inherit ,inherit))
+      (put-text-property beg end 'font-lock-face
+                         `(:strike-through t :inherit ,inherit)))))
 
 (cl-defmethod valign--align-separator-row
   (type (style (eql multi-column)) pos-list)
