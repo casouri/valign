@@ -320,13 +320,47 @@ white space stretching to XPOS, a pixel x position."
      beg end 'display
      `(space :align-to (,xpos)))))
 
-(defun valign--table-face ()
-  "Return the table face for this buffer."
-  (cond ((derived-mode-p 'org-mode)
-         'org-table)
-        ((derived-mode-p 'markdown-mode)
-         'markdown-table-face)
-        (t 'default)))
+(defun valign--face-attribute (face attribute &optional frame inherit)
+  "Return ATTRIBUTE of FACE.
+FACE can be anything a 'face text property accepts."
+  ;;    1. Simply nil.
+  (cond ((null face) nil)
+        ;; 2. A face symbol.
+        ((symbolp face) (face-attribute face attribute frame inherit))
+        ((proper-list-p face)
+         ;;    3. (:filter FILTER SPEC)
+         (cond ((eq (car face) :filter)
+                `(:filter ,(cadr face)
+                          ,(valign--face-attribute
+                            (caddr face) attribute frame inherit)))
+               ;; 4. A plist face-spec.
+               ((keywordp (car face))
+                (or (plist-get face attribute)
+                    (and inherit (face-attribute inherit attribute))))
+               ;; 5. A list of faces.  (We don’t check if it really is
+               ;; a list of faces.)
+               (t (car (cl-loop
+                        for f in face
+                        collect
+                        (valign--face-attribute f frame inherit))))))
+        ;; 6. (foreground-color . COLOR-NAME)
+        ((and (consp face) (eq (car face) 'foreground-color))
+         (plist-get (list :foreground (cdr face)) attribute))
+        ;; 7. (background-color . COLOR-NAME)
+        ((and (consp face) (eq (car face) 'background-color))
+         (plist-get (list :background (cdr face)) attribute))
+        (t (error "Valign encountered a invalid face: %s" face))))
+
+(defun valign--put-face-overlay (face beg end)
+  "Put FACE overlay between BEG and END."
+  (let* ((ov-list (overlays-in beg end))
+         (ov (make-overlay beg end nil t nil)))
+    (dolist (ov ov-list)
+      (when (overlay-get ov 'valign)
+        (delete-overlay ov)))
+    (overlay-put ov 'evaporate t)
+    (overlay-put ov 'face face)
+    (overlay-put ov 'valign t)))
 
 (defvar valign-fancy-bar)
 (defun valign--maybe-render-bar (point)
@@ -359,19 +393,16 @@ before event, ACTION is either 'entered or 'left."
     (put-text-property point (1+ point)
                        'cursor-sensor-functions
                        '(valign--fancy-bar-cursor-fn))
-    ;; We can’t just use :inverse-video because people
-    ;; uses different color for their tables, fine.
-    (let* ((inherit (valign--table-face))
-           (fg (face-attribute inherit :foreground nil 'default)))
-      (put-text-property point (1+ point) 'face
-                         `(:background ,fg :inherit ,inherit))
-      (put-text-property point (1+ point) 'font-lock-face
-                         `(:background ,fg :inherit ,inherit)))))
+    (valign--put-face-overlay '(:inverse-video t) point (1+ point))))
 
 (defun valign--clean-text-property (beg end)
   "Clean up the display text property between BEG and END."
   (with-silent-modifications
     (put-text-property beg end 'cursor-sensor-functions nil))
+  (let ((ov-list (overlays-in beg end)))
+    (dolist (ov ov-list)
+      (when (overlay-get ov 'valign)
+        (delete-overlay ov))))
   ;; TODO ‘text-property-search-forward’ is Emacs 27 feature.
   (if (boundp 'text-property-search-forward)
       (save-excursion
@@ -419,12 +450,7 @@ right bar’s position."
       ;; Render the right bar.
       (valign--maybe-render-bar (1- (point)))
       ;; Put strike-through.
-      (with-silent-modifications
-        (let ((inherit (valign--table-face)))
-          (put-text-property p (1- (point)) 'face
-                             `(:strike-through t :inherit ,inherit))
-          (put-text-property p (1- (point)) 'font-lock-face
-                             `(:strike-through t :inherit ,inherit)))))))
+      (valign--put-face-overlay '(:strike-through t) p (1- (point))))))
 
 (defun valign--separator-row-add-overlay (beg end right-pos)
   "Add overlay to a separator row’s “cell”.
@@ -448,12 +474,7 @@ Assumes point is on the right bar or plus sign."
   ;; End of Markdown
   (valign--put-text-property beg end right-pos)
   ;; Put strike-through.
-  (with-silent-modifications
-    (let ((inherit (valign--table-face)))
-      (put-text-property beg end 'face
-                         `(:strike-through t :inherit ,inherit))
-      (put-text-property beg end 'font-lock-face
-                         `(:strike-through t :inherit ,inherit)))))
+  (valign--put-face-overlay '(:strike-through t) beg end))
 
 (cl-defmethod valign--align-separator-row
   (type (style (eql multi-column)) pos-list)
