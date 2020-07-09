@@ -330,7 +330,7 @@ white space stretching to XPOS, a pixel x position."
 
 (defvar valign-fancy-bar)
 (defun valign--maybe-render-bar (point)
-  "Make the character at POINT a full hegiht bar.
+  "Make the character at POINT a full height bar.
 But only if `valign-fancy-bar' is non-nil."
   (when valign-fancy-bar
     (valign--render-bar point)))
@@ -338,7 +338,7 @@ But only if `valign-fancy-bar' is non-nil."
 (defun valign--fancy-bar-cursor-fn (window prev-pos action)
   "Run when point enters or left a fancy bar.
 Because the bar is so thin, the cursor disappears in it.  We
-expands the bar so the cursor is visible. 'cusor-intangible
+expands the bar so the cursor is visible. 'cursor-intangible
 doesn’t work because it prohibits you to put the cursor at BOL.
 
 WINDOW is just window, PREV-POS is the previous point of cursor
@@ -352,7 +352,7 @@ before event, ACTION is either 'entered or 'left."
                                 'display '(space :width (1)))))))
 
 (defun valign--render-bar (point)
-  "Make the character at POINT a full hegiht bar."
+  "Make the character at POINT a full-height bar."
   (with-silent-modifications
     (put-text-property
      point (1+ point) 'display '(space :width (1)))
