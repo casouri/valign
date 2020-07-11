@@ -726,6 +726,7 @@ FLAG is the same as in ‘org-flag-region’."
 
 ;;; Userland
 
+;;;###autoload
 (define-minor-mode valign-mode
   "Visually align Org tables."
   :require 'valign
