@@ -26,4 +26,4 @@ Set ~valign-separator-row-style~ to ~single-column~:
 [[./single-column.png]]
 
 * If function advice makes you itch
-~valign-mode~ adds advice and doesn’t remove them even if you close ~valign-mode~ because function advice is global and ~valign-mode~ is local. If you want to remove the advice, use ~valign-remove-advice~. If you run this while some buffer still has ~valign-mode~ on, they break. So there is no point running it, really. Just accept it.
+~valign-mode~ adds advice and doesn’t remove them even if you close ~valign-mode~ because function advice is global and ~valign-mode~ is local. If you want to remove the advice, use ~valign-remove-advice~. If you run this while some buffer still has ~valign-mode~ on, they break. So there is no point running it, really.
