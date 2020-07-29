@@ -508,10 +508,10 @@ You need to restart valign mode for this setting to take effect."
 (defun valign-table ()
   "Visually align the table at point."
   (interactive)
-  (if (not window-system)
-      (signal 'valign-not-gui nil))
   (condition-case nil
       (save-excursion
+        (if (not window-system)
+            (signal 'valign-not-gui nil))
         (let (end column-width-list column-idx pos ssw bar-width
                   separator-row-point-list rev-list
                   column-alignment-list info at-sep-row right-bar-pos)
