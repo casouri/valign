@@ -514,13 +514,12 @@ You need to restart valign mode for this setting to take effect."
             (signal 'valign-not-gui nil))
         (let (end column-width-list column-idx pos ssw bar-width
                   separator-row-point-list rev-list
-                  column-alignment-list info at-sep-row
-                  right-bar-pos)
+                  column-alignment-list info at-sep-row right-bar-pos)
           ;; ‘separator-row-point-list’ marks the point for each
           ;; separator-row, so we can later come back and align them.
-          ;; ‘rev-list’ is the reverse list of right positions of
-          ;; each separator row cell.  ‘at-sep-row’ t means we
-          ;; are at a separator row.
+          ;; ‘rev-list’ is the reverse list of right positions of each
+          ;; separator row cell.  ‘at-sep-row’ t means we are at
+          ;; a separator row.
           (if (not (valign--at-table-p))
               (signal 'valign-not-on-table nil))
           (valign--end-of-table)
@@ -552,10 +551,9 @@ You need to restart valign mode for this setting to take effect."
                   ;; single-space-width
                   (unless ssw (setq ssw (valign--pixel-width-from-to
                                          (point) (1+ (point)))))
-                  (unless bar-width
-                    (setq bar-width
-                          (valign--pixel-width-from-to
-                           (1- (point)) (point))))
+                  (unless bar-width (setq bar-width
+                                          (valign--pixel-width-from-to
+                                           (1- (point)) (point))))
                   ;; Initialize some numbers when we are at a new
                   ;; line.  ‘pos’ is the pixel position of the
                   ;; current point, i.e., after the left bar.
@@ -566,8 +564,7 @@ You need to restart valign mode for this setting to take effect."
                     (valign--maybe-render-bar (1- (point)))
                     (unless (valign--separator-p)
                       (setq rev-list nil))
-                    (setq at-sep-row
-                          (if (valign--separator-p) t nil))
+                    (setq at-sep-row (if (valign--separator-p) t nil))
                     (setq pos (valign--pixel-width-from-to
                                (line-beginning-position) (point))))
                   ;; Align cell.
@@ -577,8 +574,7 @@ You need to restart valign mode for this setting to take effect."
                          (valign--skip-space-forward)
                          (if (< (- (point) tab-start) 2)
                              (valign--put-text-property
-                              tab-start (point)
-                              (+ pos col-width ssw))
+                              tab-start (point) (+ pos col-width ssw))
                            ;; When possible, we try to add two tabs
                            ;; and the point can appear in the middle
                            ;; of the cell, instead of on the very
@@ -590,15 +586,13 @@ You need to restart valign mode for this setting to take effect."
                            (valign--put-text-property
                             (1+ tab-start) (point)
                             (+ pos col-width ssw))))
-                        ;; 2) Separator row.  We don’t align the
-                        ;; separator row yet, but will come back to
-                        ;; it.
+                        ;; 2) Separator row.  We don’t align the separator
+                        ;; row yet, but will come back to it.
                         ((valign--separator-p) nil)
                         ;; 3) Normal cell.
                         (t (pcase (valign--cell-alignment
                                    (valign--guess-table-type)
-                                   (nth column-idx
-                                        column-alignment-list))
+                                   (nth column-idx column-alignment-list))
                              ;; 3.1) Align a left-aligned cell.
                              ('left (search-forward "|" nil t)
                                     (backward-char)
@@ -624,8 +618,7 @@ You need to restart valign mode for this setting to take effect."
                                          valign-separator-row-style
                                          (reverse rev-list)))))
 
-    ((debug valign-bad-cell valign-not-gui valign-not-on-table)
-     nil)))
+    ((debug valign-bad-cell valign-not-gui valign-not-on-table) nil)))
 
 ;;; Mode intergration
 
