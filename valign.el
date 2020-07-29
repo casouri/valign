@@ -326,37 +326,6 @@ white space stretching to XPOS, a pixel x position."
      beg end 'display
      `(space :align-to (,xpos)))))
 
-(defun valign--face-attribute (face attribute &optional frame inherit)
-  "Return ATTRIBUTE of FACE.
-FACE can be anything a 'face text property accepts."
-  ;;    1. Simply nil.
-  (cond ((null face) nil)
-        ;; 2. A face symbol.
-        ((symbolp face) (face-attribute face attribute frame inherit))
-        ((proper-list-p face)
-         ;;    3. (:filter FILTER SPEC)
-         (cond ((eq (car face) :filter)
-                `(:filter ,(cadr face)
-                          ,(valign--face-attribute
-                            (caddr face) attribute frame inherit)))
-               ;; 4. A plist face-spec.
-               ((keywordp (car face))
-                (or (plist-get face attribute)
-                    (and inherit (face-attribute inherit attribute))))
-               ;; 5. A list of faces.  (We don’t check if it really is
-               ;; a list of faces.)
-               (t (car (cl-loop
-                        for f in face
-                        collect
-                        (valign--face-attribute f frame inherit))))))
-        ;; 6. (foreground-color . COLOR-NAME)
-        ((and (consp face) (eq (car face) 'foreground-color))
-         (plist-get (list :foreground (cdr face)) attribute))
-        ;; 7. (background-color . COLOR-NAME)
-        ((and (consp face) (eq (car face) 'background-color))
-         (plist-get (list :background (cdr face)) attribute))
-        (t (error "Valign encountered a invalid face: %s" face))))
-
 (defun valign--put-face-overlay (face beg end)
   "Put FACE overlay between BEG and END."
   (let* ((ov-list (overlays-in beg end))
