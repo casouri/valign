@@ -506,6 +506,7 @@ You need to restart valign mode for this setting to take effect."
   :group 'valign)
 
 (defun valign-table ()
+  "Visually align the table at point."
   (interactive)
   (condition-case nil
       (save-excursion
