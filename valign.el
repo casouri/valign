@@ -629,8 +629,8 @@ You need to restart valign mode for this setting to take effect."
   "Align table but don’t emit any errors."
   (condition-case err
       (valign-table)
-    ((debug error) (message "Valign error when aligning table: %s"
-                            (error-message-string err)))))
+    (error (message "Valign error when aligning table: %s"
+                    (error-message-string err)))))
 
 (defun valign-region (&optional beg end)
   "Align tables between BEG and END.
