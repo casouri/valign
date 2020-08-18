@@ -355,8 +355,10 @@ before event, ACTION is either 'entered or 'left."
   (ignore window)
   (with-silent-modifications
     (pcase action
-      ('entered (put-text-property (point) (1+ (point))
-                                   'display " "))
+      ('entered (put-text-property
+                 (point) (1+ (point))
+                 'display (if (eq cursor-type 'bar)
+                              '(space :width (3)) " ")))
       ('left (put-text-property prev-pos (1+ prev-pos)
                                 'display '(space :width (1)))))))
 
