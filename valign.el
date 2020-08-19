@@ -46,13 +46,11 @@
 (define-error 'valign-not-gui "Valign only works in GUI environment")
 (define-error 'valign-not-on-table "Valign is asked to align a table, but the point is not on one")
 
-(cl-defmethod valign--cell-alignment ((type (eql org)) hint)
+(defun valign--cell-alignment ()
   "Return how is current cell aligned.
 Return 'left if aligned left, 'right if aligned right.
 Assumes point is after the left bar (“|”).
-Doesn’t check if we are in a cell.
-TYPE must be 'org-mode.  HINT is not used."
-  (ignore type hint)
+Doesn’t check if we are in a cell."
   (save-excursion
     (if (looking-at " [^ ]")
         'left
@@ -62,16 +60,6 @@ TYPE must be 'org-mode.  HINT is not used."
              "[^ ] |" (max (- (point) 3) (point-min)))
             'right
           'left)))))
-
-(cl-defmethod valign--cell-alignment
-  ((type (eql markdown)) hint)
-  "Return how is current cell aligned.
-Return 'left if aligned left, 'right if aligned right.
-Assumes point is after the left bar (“|”).
-Doesn’t check if we are in a cell.
-TYPE must be 'markdown-mode.  Simply return HINT."
-  (ignore type)
-  (or hint 'left))
 
 ;; (if (string-match (rx (seq (* " ")
 ;;                            ;; e.g., “5.”, “5.4”
@@ -100,16 +88,18 @@ Return nil if not in a cell."
   ;;      EMPTY     := <SPACE>+
   ;;      NON-EMPTY := <SPACE>+<NON-SPACE>+<SPACE>+
   ;;      DELIM     := | or +
-  (let ((start (point)))
+  (let (start)
     (save-excursion
-      (valign--skip-space-forward)
+      (skip-chars-forward " ")
+      (setq start (point))
       (if (looking-at-p "[|]")
           0
         (if (not (search-forward "|" nil t))
             (signal 'valign-bad-cell nil)
           ;; We are at the right “|”
-          (valign--pixel-width-from-to
-           (1+ start) (1- (match-beginning 0))))))))
+          (goto-char (match-beginning 0))
+          (skip-chars-backward " ")
+          (valign--pixel-width-from-to start (point)))))))
 
 ;; (defun valign--font-at (p)
 ;;   (find-font
@@ -164,40 +154,6 @@ cleaned before using this."
          (line-number-display-width 'pixel)
        0)))
 
-(defun valign--skip-space-backward ()
-  "Like (skip-chars-forward \" \").
-But we don’t skip over chars with display property."
-  (condition-case nil
-      (while (and (eq (char-before) ?\s)
-                  (let ((display
-                         (plist-get (text-properties-at (1- (point)))
-                                    'display)))
-                    ;; When do we stop: when there is a display property
-                    ;; and it’s not a stretch property.
-                    (not (and display
-                              (consp display)
-                              (not (eq (car display) 'space))))))
-        (backward-char))
-    (beginning-of-buffer nil)
-    (end-of-buffer nil)))
-
-(defun valign--skip-space-forward ()
-  "Like (skip-chars-backward \" \").
-But we don’t skip over chars with display property."
-  (condition-case nil
-      (while (and (eq (char-after) ?\s)
-                  (let ((display
-                         (plist-get (text-properties-at (point))
-                                    'display)))
-                    ;; When do we stop: when there is a display property
-                    ;; and it’s not a stretch property.
-                    (not (and display
-                              (consp display)
-                              (not (eq (car display) 'space))))))
-        (forward-char))
-    (beginning-of-buffer nil)
-    (end-of-buffer nil)))
-
 (defun valign--separator-p ()
   "If the current cell is actually a separator.
 Assume point is after the left bar (“|”)."
@@ -233,24 +189,20 @@ Don’t go over LIMIT."
          ;; Point is after the left “|”.
          (progn ,@body)))))
 
-(cl-defstruct valign-table-info
-  "Information about the current table."
-  ;; Width of each column.
-  column-width-list
-  ;; Alignment of each column, can be either 'left or 'right, only
-  ;; used by markdown.  (Technically we can determine the alignment
-  ;; from each cell’s padding spaces, but the widest cell in a
-  ;; right-aligned column has one space on both side, and we can’t
-  ;; determine the alignment for that cell.)
-  column-alignment-list)
+(defun valign--alist-to-list (alist)
+  "Convert an ALIST ((0 . a) (1 . b) (2 . c)) to (a b c)."
+  (let ((inc 0) return-list)
+    (while (alist-get inc alist)
+      (push (alist-get inc alist)
+            return-list)
+      (cl-incf inc))
+    (reverse return-list)))
 
-(defun valign--calculate-table-info (limit)
+(defun valign--calculate-cell-width (limit)
   "Return a list of column widths.
 Each column width is the largest cell width of the column.
 Start from point, stop at LIMIT."
-  (let (column-width-alist
-        column-alignment-alist
-        column-idx)
+  (let (column-width-alist column-idx)
     (save-excursion
       (valign--do-table column-idx limit
         ;; Point is after the left “|”.
@@ -264,24 +216,47 @@ Start from point, stop at LIMIT."
             ;; still record it.
             (if (>= cell-width (or oldmax 0))
                 (setf (alist-get column-idx column-width-alist)
-                      cell-width))))
-        ;; Calculate the alignment if we are on the separator row
-        ;; for markdown.
+                      cell-width))))))
+    ;; Turn alist into a list.
+    (mapcar (lambda (width) (+ width 16))
+            (valign--alist-to-list column-width-alist))))
+
+(cl-defmethod valign--calculate-alignment ((type (eql markdown)) limit)
+  "Return a list of alignments ('left or 'right) for each column.
+TYPE must be 'markdown.  Start at point, stop at LIMIT."
+  (ignore type)
+  (let (column-idx column-alignment-alist)
+    (save-excursion
+      (valign--do-table column-idx limit
         (when (valign--separator-p)
           (setf (alist-get column-idx column-alignment-alist)
-                (valign--alignment-from-seperator)))))
-    ;; Turn alist into a list.
-    (let ((inc 0) return-width-list return-alignment-list)
-      (while (alist-get inc column-width-alist)
-        ;; Add 16 pixels of padding.
-        (push (+ (alist-get inc column-width-alist) 16)
-              return-width-list)
-        (push (alist-get inc column-alignment-alist)
-              return-alignment-list)
-        (cl-incf inc))
-      (make-valign-table-info
-       :column-width-list (reverse return-width-list)
-       :column-alignment-list (reverse return-alignment-list)))))
+                (valign--alignment-from-seperator))))
+      (valign--alist-to-list column-alignment-alist))))
+
+(cl-defmethod valign--calculate-alignment ((type (eql org)) limit)
+  "Return a list of alignments ('left or 'right) for each column.
+TYPE must be 'org.  Start at point, stop at LIMIT."
+  ;; Why can’t infer the alignment on each cell by its space padding?
+  ;; Because the widest cell of a column has one space on both side,
+  ;; making it impossible to infer the alignment.
+  (ignore type)
+  (let (column-idx column-alignment-alist)
+    (save-excursion
+      (valign--do-table column-idx limit
+        (when (not (valign--separator-p))
+          (setf (alist-get column-idx column-alignment-alist)
+                (cons (valign--cell-alignment)
+                      (alist-get column-idx column-alignment-alist)))))
+      ;; Now we have an alist
+      ;; ((0 . (left left right left ...) (1 . (...))))
+      ;; For each column, we take the majority.
+      (cl-labels ((majority (list)
+                            (let ((left-count (cl-count 'left list))
+                                  (right-count (cl-count 'right list)))
+                              (if (> left-count right-count)
+                                  'left 'right))))
+        (mapcar #'majority
+                (valign--alist-to-list column-alignment-alist))))))
 
 (defun valign--at-table-p ()
   "Return non-nil if point is in a table."
@@ -347,7 +322,7 @@ But only if `valign-fancy-bar' is non-nil."
 (defun valign--fancy-bar-cursor-fn (window prev-pos action)
   "Run when point enters or left a fancy bar.
 Because the bar is so thin, the cursor disappears in it.  We
-expands the bar so the cursor is visible. 'cursor-intangible
+expands the bar so the cursor is visible.  'cursor-intangible
 doesn’t work because it prohibits you to put the cursor at BOL.
 
 WINDOW is just window, PREV-POS is the previous point of cursor
@@ -524,7 +499,7 @@ You need to restart valign mode for this setting to take effect."
   "Visually align the table at point."
   (let (end column-width-list column-idx pos ssw bar-width
             separator-row-point-list rev-list
-            column-alignment-list info at-sep-row right-bar-pos)
+            column-alignment-list at-sep-row right-bar-pos)
     ;; ‘separator-row-point-list’ marks the point for each
     ;; separator-row, so we can later come back and align them.
     ;; ‘rev-list’ is the reverse list of right positions of each
@@ -534,11 +509,11 @@ You need to restart valign mode for this setting to take effect."
     (setq end (point))
     (valign--beginning-of-table)
     (valign--clean-text-property (point) end)
-    (setq info (valign--calculate-table-info end))
     (setq column-width-list
-          (valign-table-info-column-width-list info)
+          (valign--calculate-cell-width end)
           column-alignment-list
-          (valign-table-info-column-alignment-list info))
+          (valign--calculate-alignment
+           (valign--guess-table-type) end))
     ;; Iterate each cell and apply tab stops.
     (valign--do-table column-idx end
       (save-excursion
@@ -553,6 +528,7 @@ You need to restart valign mode for this setting to take effect."
           ;; Start aligning this cell.
           ;;      Pixel width of the column
           (let* ((col-width (nth column-idx column-width-list))
+                 (alignment (nth column-idx column-alignment-list))
                  ;; Pixel width of the cell.
                  (cell-width (valign--cell-width))
                  tab-width tab-start tab-end)
@@ -579,7 +555,7 @@ You need to restart valign mode for this setting to take effect."
             (cond ((eq cell-width 0)
                    ;; 1) Empty cell.
                    (setq tab-start (point))
-                   (valign--skip-space-forward)
+                   (skip-chars-forward " ")
                    (if (< (- (point) tab-start) 2)
                        (valign--put-text-property
                         tab-start (point) (+ pos col-width ssw))
@@ -598,22 +574,22 @@ You need to restart valign mode for this setting to take effect."
                   ;; row yet, but will come back to it.
                   ((valign--separator-p) nil)
                   ;; 3) Normal cell.
-                  (t (pcase (valign--cell-alignment
-                             (valign--guess-table-type)
-                             (nth column-idx column-alignment-list))
+                  (t (pcase alignment
                        ;; 3.1) Align a left-aligned cell.
                        ('left (search-forward "|" nil t)
                               (backward-char)
                               (setq tab-end (point))
-                              (valign--skip-space-backward)
+                              (skip-chars-backward " ")
                               (valign--put-text-property
                                (point) tab-end
                                (+ pos col-width ssw)))
                        ;; 3.2) Align a right-aligned cell.
                        ('right (setq tab-width
                                      (- col-width cell-width))
+                               (setq tab-start (point))
+                               (skip-chars-forward " ")
                                (valign--put-text-property
-                                (point) (1+ (point))
+                                tab-start (point)
                                 (+ pos tab-width))))))
             ;; Update ‘pos’ for the next cell.
             (setq pos (+ pos col-width bar-width ssw))
