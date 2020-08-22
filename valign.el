@@ -101,41 +101,6 @@ Return nil if not in a cell."
           (skip-chars-backward " ")
           (valign--pixel-width-from-to start (point)))))))
 
-;; (defun valign--font-at (p)
-;;   (find-font
-;;    (font-spec
-;;     :name (face-font (get-text-property (point) 'face)
-;;                      nil
-;;                      (char-after)))))
-
-;; Obsolete.
-(defun valign--tab-width (font)
-  "Return the pixel width of a tab in FONT."
-  ;; FIXME We have to over-estimate the pixel width of a tab.  Since
-  ;; it is very hard to compute the exact width of it (basically Emacs
-  ;; redisplay calculates tab width based one the iterators position
-  ;; on-the-fly, to calculate the exact width of a tab, you need to
-  ;; know it’s _position_, that means calculating from the left edge).
-  (* (or tab-width 8)
-     ;; FIXME For some unknown reason, tab-width is
-     ;; sometimes nil, someone should investigate.
-     (aref (aref (font-get-glyphs font 0 1 " ") 0) 4)))
-
-;; Obsolete.
-(defun valign--glyph-width-at-point (&optional point)
-  "Return the pixel width of the glyph at POINT.
-The buffer has to be visible.  If point is at an image, this
-function doens’t return the image’s width, but the underlining
-character’s glyph width."
-  (let* ((p (or point (point))))
-    ;; car + mapcar to translate the vector to a list.
-    (if (eq (char-after point) ?\t)
-        (valign--tab-width (font-at p))
-      ;; (font-at 0 nil (buffer-substring p (1+ p))) doesn’t work, the
-      ;; font is sometimes wrong.  (font-at p) doesn’t work, because
-      ;; it requires the buffer to be visible.
-      (aref (aref (font-get-glyphs (font-at p) p (1+ p)) 0) 4))))
-
 ;; We used to use a custom functions that calculates the pixel text
 ;; width that doesn’t require a live window.  However that function
 ;; has some limitations, including not working right with face remapping.
