@@ -159,6 +159,7 @@ COLUMN-IDX-SYM is bound to the index of the column (0-based)."
   (declare (indent 1))
   `(progn
      (setq ,column-idx-sym 0)
+     (beginning-of-line)
      (while (search-forward "|" (line-end-position) t)
        ;; Unless we are after the last bar.
        (unless (looking-at "[^|]*\n")
