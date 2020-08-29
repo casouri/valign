@@ -339,35 +339,20 @@ before event, ACTION is either 'entered or 'left."
       (when (overlay-get ov 'valign)
         (delete-overlay ov))))
   ;; TODO ‘text-property-search-forward’ is Emacs 27 feature.
-  (if (boundp 'text-property-search-forward)
-      (save-excursion
-        (let (match)
-          (goto-char beg)
-          (while (and (setq match
-                            (text-property-search-forward
-                             'display nil (lambda (_ p)
-                                            (and (consp p)
-                                                 (eq (car p) 'space)))))
-                      (< (point) end))
-            (with-silent-modifications
-              (put-text-property (prop-match-beginning match)
-                                 (prop-match-end match)
-                                 'display nil)))))
-    ;; Before Emacs 27.
-    (let (display tab-end (p beg) last-p)
-      (while (not (eq p last-p))
-        (setq last-p p
-              p (next-single-char-property-change p 'display nil end))
-        (when (and (setq display
-                         (plist-get (text-properties-at p) 'display))
-                   (consp display)
-                   (eq (car display) 'space))
-          ;; We are at the beginning of a tab, now find the end.
-          (setq tab-end (next-single-char-property-change
-                         p'display nil end))
-          ;; Remove text property.
-          (with-silent-modifications
-            (put-text-property p tab-end 'display nil)))))))
+  (let (display tab-end (p beg) last-p)
+    (while (not (eq p last-p))
+      (setq last-p p
+            p (next-single-char-property-change p 'display nil end))
+      (when (and (setq display
+                       (plist-get (text-properties-at p) 'display))
+                 (consp display)
+                 (eq (car display) 'space))
+        ;; We are at the beginning of a tab, now find the end.
+        (setq tab-end (next-single-char-property-change
+                       p'display nil end))
+        ;; Remove text property.
+        (with-silent-modifications
+          (put-text-property p tab-end 'display nil))))))
 
 (cl-defmethod valign--align-separator-row
   (type (style (eql single-column)) column-width-list)
