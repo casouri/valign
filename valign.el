@@ -556,13 +556,6 @@ You need to restart valign mode for this setting to take effect."
 
 ;;; Mode intergration
 
-(defun valign-table-quiet ()
-  "Align table but don’t emit any errors."
-  (condition-case err
-      (valign-table)
-    (error (message "Valign error when aligning table: %s"
-                    (error-message-string err)))))
-
 (defun valign-region (&optional beg end)
   "Align tables between BEG and END.
 Supposed to be called from jit-lock.
@@ -577,10 +570,9 @@ Force align if FORCE non-nil."
         (goto-char beg)
         (while (and (search-forward "|" nil t)
                     (< (point) end))
-          (valign-table-quiet)
-          (valign--end-of-table))
-        (with-silent-modifications
-          (put-text-property beg (point) 'valign-init t)))))
+          (with-demoted-errors "Valign error when aligning table: %s"
+            (valign-table))
+          (valign--end-of-table)))))
   (cons 'jit-lock-bounds (cons beg end)))
 
 (defvar valign-mode)
