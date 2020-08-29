@@ -275,25 +275,18 @@ Assumes point is on a table."
     (forward-line)
     (end-of-line)))
 
-(defun valign--put-text-property (beg end xpos)
-  "Put text property on text from BEG to END.
-The text property asks Emacs to display the text as
-white space stretching to XPOS, a pixel x position."
-  (with-silent-modifications
-    (put-text-property
-     beg end 'display
-     `(space :align-to (,xpos)))))
-
-(defun valign--put-face-overlay (face beg end)
-  "Put FACE overlay between BEG and END."
-  (let* ((ov-list (overlays-in beg end))
-         (ov (make-overlay beg end nil t nil)))
-    (dolist (ov ov-list)
-      (when (overlay-get ov 'valign)
-        (delete-overlay ov)))
+(defun valign--put-overlay (beg end &rest props)
+  "Put overlay between BEG and END.
+PROPS contains properties and values."
+  (let ((ov (make-overlay beg end)))
+    (overlay-put ov 'valign t)
     (overlay-put ov 'evaporate t)
-    (overlay-put ov 'face face)
-    (overlay-put ov 'valign t)))
+    (while props
+      (overlay-put ov (pop props) (pop props)))))
+
+(defsubst valign--space (xpos)
+  "Return a display property that aligns to XPOS."
+  `(space :align-to (,xpos)))
 
 (defvar valign-fancy-bar)
 (defun valign--maybe-render-bar (point)
@@ -323,12 +316,12 @@ before event, ACTION is either 'entered or 'left."
 (defun valign--render-bar (point)
   "Make the character at POINT a full-height bar."
   (with-silent-modifications
-    (put-text-property
-     point (1+ point) 'display '(space :width (1)))
+    (put-text-property point (1+ point)
+                       'display '(space :width (1)))
     (put-text-property point (1+ point)
                        'cursor-sensor-functions
                        '(valign--fancy-bar-cursor-fn))
-    (valign--put-face-overlay '(:inverse-video t) point (1+ point))))
+    (valign--put-overlay point (1+ point) 'face '(:inverse-video t))))
 
 (defun valign--clean-text-property (beg end)
   "Clean up the display text property between BEG and END."
@@ -337,22 +330,7 @@ before event, ACTION is either 'entered or 'left."
   (let ((ov-list (overlays-in beg end)))
     (dolist (ov ov-list)
       (when (overlay-get ov 'valign)
-        (delete-overlay ov))))
-  ;; TODO ‘text-property-search-forward’ is Emacs 27 feature.
-  (let (display tab-end (p beg) last-p)
-    (while (not (eq p last-p))
-      (setq last-p p
-            p (next-single-char-property-change p 'display nil end))
-      (when (and (setq display
-                       (plist-get (text-properties-at p) 'display))
-                 (consp display)
-                 (eq (car display) 'space))
-        ;; We are at the beginning of a tab, now find the end.
-        (setq tab-end (next-single-char-property-change
-                       p'display nil end))
-        ;; Remove text property.
-        (with-silent-modifications
-          (put-text-property p tab-end 'display nil))))))
+        (delete-overlay ov)))))
 
 (cl-defmethod valign--align-separator-row
   (type (style (eql single-column)) column-width-list)
@@ -369,11 +347,10 @@ STYLE is 'single-column.  COLUMN-WIDTH-LIST is returned from
          (total-width (+ (apply #'+ column-width-list)
                          (* bar-width (1+ column-count)))))
     (when (search-forward "|" nil t)
-      (valign--put-text-property p (1- (point)) total-width)
+      (valign--put-overlay p (1- (point)) total-width
+                           'face '(:strike-through t))
       ;; Render the right bar.
-      (valign--maybe-render-bar (1- (point)))
-      ;; Put strike-through.
-      (valign--put-face-overlay '(:strike-through t) p (1- (point))))))
+      (valign--maybe-render-bar (1- (point))))))
 
 (defun valign--separator-row-add-overlay (beg end right-pos)
   "Add overlay to a separator row’s “cell”.
@@ -385,8 +362,9 @@ Assumes point is on the right bar or plus sign."
       ;; Render the right bar.
       (valign--render-bar end)
     (when (eq (char-after end) ?+)
-      (with-silent-modifications
-        (put-text-property end (1+ end) 'display "|"))))
+      (let ((ov (make-overlay end (1+ end))))
+        (overlay-put ov 'display "|")
+        (overlay-put ov 'valign t))))
   ;; Markdown row
   (when (eq (char-after beg) ?:)
     (setq beg (1+ beg)))
@@ -395,9 +373,9 @@ Assumes point is on the right bar or plus sign."
           right-pos (- right-pos
                        (valign--glyph-width-at-point (1- end)))))
   ;; End of Markdown
-  (valign--put-text-property beg end right-pos)
-  ;; Put strike-through.
-  (valign--put-face-overlay '(:strike-through t) beg end))
+  (valign--put-overlay beg end
+                       'display (valign--space right-pos)
+                       'face '(:strike-through t)))
 
 (cl-defmethod valign--align-separator-row
   (type (style (eql multi-column)) column-width-list)
@@ -511,43 +489,47 @@ You need to restart valign mode for this setting to take effect."
                    (cell-width (valign--cell-width))
                    tab-width tab-start tab-end)
               ;; Align cell.
-              (cond ((eq cell-width 0)
-                     ;; 1) Empty cell.
-                     (setq tab-start (point))
-                     (skip-chars-forward " ")
-                     (if (< (- (point) tab-start) 2)
-                         (valign--put-text-property
-                          tab-start (point)
-                          (+ column-start col-width space-width))
-                       ;; When possible, we try to add two tabs
-                       ;; and the point can appear in the middle
-                       ;; of the cell, instead of on the very
-                       ;; left or very right.
-                       (valign--put-text-property
-                        tab-start
-                        (1+ tab-start)
-                        (+ column-start (/ col-width 2) space-width))
-                       (valign--put-text-property
-                        (1+ tab-start) (point)
-                        (+ column-start col-width space-width))))
-                    ;; 2) Normal cell.
-                    (t (pcase alignment
-                         ;; 2.1) Align a left-aligned cell.
-                         ('left (search-forward "|" nil t)
-                                (backward-char)
-                                (setq tab-end (point))
-                                (skip-chars-backward " ")
-                                (valign--put-text-property
-                                 (point) tab-end
-                                 (+ column-start col-width space-width)))
-                         ;; 2.2) Align a right-aligned cell.
-                         ('right (setq tab-width
-                                       (- col-width cell-width))
-                                 (setq tab-start (point))
-                                 (skip-chars-forward " ")
-                                 (valign--put-text-property
-                                  tab-start (point)
-                                  (+ column-start tab-width))))))
+              (cl-labels ((valign--put-ov
+                           (beg end xpos)
+                           (valign--put-overlay beg end 'display
+                                                (valign--space xpos))))
+                (cond ((eq cell-width 0)
+                       ;; 1) Empty cell.
+                       (setq tab-start (point))
+                       (skip-chars-forward " ")
+                       (if (< (- (point) tab-start) 2)
+                           (valign--put-ov
+                            tab-start (point)
+                            (+ column-start col-width space-width))
+                         ;; When possible, we try to add two tabs
+                         ;; and the point can appear in the middle
+                         ;; of the cell, instead of on the very
+                         ;; left or very right.
+                         (valign--put-ov
+                          tab-start
+                          (1+ tab-start)
+                          (+ column-start (/ col-width 2) space-width))
+                         (valign--put-ov
+                          (1+ tab-start) (point)
+                          (+ column-start col-width space-width))))
+                      ;; 2) Normal cell.
+                      (t (pcase alignment
+                           ;; 2.1) Align a left-aligned cell.
+                           ('left (search-forward "|" nil t)
+                                  (backward-char)
+                                  (setq tab-end (point))
+                                  (skip-chars-backward " ")
+                                  (valign--put-ov
+                                   (point) tab-end
+                                   (+ column-start col-width space-width)))
+                           ;; 2.2) Align a right-aligned cell.
+                           ('right (setq tab-width
+                                         (- col-width cell-width))
+                                   (setq tab-start (point))
+                                   (skip-chars-forward " ")
+                                   (valign--put-ov
+                                    tab-start (point)
+                                    (+ column-start tab-width)))))))
               ;; Update ‘column-start’ for the next cell.
               (setq column-start (+ column-start
                                     col-width
@@ -607,8 +589,6 @@ FLAG is the same as in ‘org-flag-region’."
   ;; Remove text properties
   (with-silent-modifications
     (valign--clean-text-property (point-min) (point-max))
-    ;; Remove fancy bar’s text properties.
-    (put-text-property (point-min) (point-max) 'face nil)
     (put-text-property (point-min) (point-max) 'font-lock-face nil)
     (jit-lock-refontify)))
 
