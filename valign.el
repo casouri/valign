@@ -455,12 +455,13 @@ You need to restart valign mode for this setting to take effect."
                       (valign--pixel-width-from-to
                        (match-beginning 0) (match-end 0))))
          (table-end (save-excursion (valign--end-of-table) (point)))
+         ;; Very hacky, but..
+         (_ (valign--clean-text-property (point) table-end))
          (column-width-list (valign--calculate-cell-width table-end))
          (column-alignment-list (valign--calculate-alignment
                                  (valign--guess-table-type) table-end))
          row-idx column-idx column-start)
     (ignore row-idx)
-    (valign--clean-text-property (point) table-end)
 
     ;; Start alignment.
     (valign--do-row row-idx table-end
