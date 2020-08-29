@@ -369,16 +369,19 @@ before event, ACTION is either 'entered or 'left."
             (put-text-property p tab-end 'display nil)))))))
 
 (cl-defmethod valign--align-separator-row
-  (type (style (eql single-column)) pos-list)
+  (type (style (eql single-column)) column-width-list)
   "Align the separator row (|---+---|) as “|---------|”.
 Assumes the point is after the left bar (“|”).  TYPE can be
 either 'org-mode or 'markdown, it doesn’t make any difference.
-STYLE is 'single-column.  POS-LIST is a list of each column’s
-right bar’s position."
+STYLE is 'single-column.  COLUMN-WIDTH-LIST is returned from
+`valign--calculate-cell-width'."
   (ignore type style)
-  (let ((p (point))
-        ;; Position of the right-most bar.
-        (total-width (car (last pos-list))))
+  (let* ((p (point))
+         (column-count (length column-width-list))
+         (bar-width (valign--pixel-width-from-to (1- (point)) (point)))
+         ;; Position of the right-most bar.
+         (total-width (+ (apply #'+ column-width-list)
+                         (* bar-width (1+ column-count)))))
     (when (search-forward "|" nil t)
       (valign--put-text-property p (1- (point)) total-width)
       ;; Render the right bar.
@@ -411,28 +414,27 @@ Assumes point is on the right bar or plus sign."
   (valign--put-face-overlay '(:strike-through t) beg end))
 
 (cl-defmethod valign--align-separator-row
-  (type (style (eql multi-column)) pos-list)
+  (type (style (eql multi-column)) column-width-list)
   "Align the separator row in multi column style.
 TYPE can be 'org-mode or 'markdown-mode, STYLE is 'multi-column.
-POS-LIST is a list of positions for each column’s right bar."
+COLUMN-WIDTH-LIST is returned from `valign--calculate-cell-width'."
   (ignore type style)
-  (let ((p (point))
+  (let ((bar-width (valign--pixel-width-from-to (1- (point)) (point)))
+        (space-width (save-excursion
+                       (search-forward " ")
+                       (valign--pixel-width-from-to
+                        (match-beginning 0) (match-end 0))))
+        (column-start (point))
         (col-idx 0)
-        (max-col (1- (length pos-list)))
-        (seperator-p (valign--separator-p)))
-    (while (and (< (point) (point-max))
-                (<= col-idx max-col)
-                (re-search-forward "[+|]" (line-end-position) t))
-      ;; Separator rows that has empty cells (|----|    |----|)
-      ;; is also possible.  `seperator-p' is t only for |----|.
-      (if seperator-p
-          (valign--separator-row-add-overlay
-           p (1- (point)) (nth col-idx pos-list))
-        (valign--put-text-property
-         p (1- (point)) (nth col-idx pos-list)))
-      (cl-incf col-idx)
-      (setq p (point))
-      (setq seperator-p (valign--separator-p)))))
+        (pos (valign--pixel-width-from-to
+              (line-beginning-position) (point))))
+    (while (re-search-forward "[+|]" (line-end-position) t)
+      (let ((column-width (nth col-idx column-width-list)))
+        (valign--separator-row-add-overlay
+         column-start (1- (point)) (+ pos column-width space-width))
+        (setq column-start (point)
+              pos (+ pos column-width bar-width space-width))
+        (cl-incf col-idx)))))
 
 (defun valign--guess-table-type ()
   "Return either 'org or 'markdown."
@@ -518,11 +520,16 @@ You need to restart valign mode for this setting to take effect."
                    (cell-width (valign--cell-width))
                    tab-width tab-start tab-end)
               ;; single-space-width
-              (unless ssw (setq ssw (valign--pixel-width-from-to
-                                     (point) (1+ (point)))))
-              (unless bar-width (setq bar-width
-                                      (valign--pixel-width-from-to
-                                       (1- (point)) (point))))
+              (unless ssw
+                (setq ssw (save-excursion
+                            (search-forward " ")
+                            (valign--pixel-width-from-to
+                             (match-beginning 0) (match-end 0)))))
+              (unless bar-width
+                (setq bar-width (save-excursion
+                                  (search-forward "|")
+                                  (valign--pixel-width-from-to
+                                   (match-beginning 0) (match-end 0)))))
               ;; Initialize some numbers when we are at a new
               ;; line.  ‘pos’ is the pixel position of the
               ;; current point, i.e., after the left bar.
@@ -557,7 +564,11 @@ You need to restart valign mode for this setting to take effect."
                         (+ pos col-width ssw))))
                     ;; 2) Separator row.  We don’t align the separator
                     ;; row yet, but will come back to it.
-                    ((valign--separator-p) nil)
+                    ((valign--separator-p)
+                     (valign--align-separator-row
+                      (valign--guess-table-type)
+                      valign-separator-row-style
+                      column-width-list))
                     ;; 3) Normal cell.
                     (t (pcase alignment
                          ;; 3.1) Align a left-aligned cell.
@@ -579,13 +590,7 @@ You need to restart valign mode for this setting to take effect."
               ;; Update ‘pos’ for the next cell.
               (setq pos (+ pos col-width bar-width ssw))
               (unless at-sep-row
-                (push (- pos bar-width) rev-list)))))))
-    ;; After aligning all rows, align the separator row.
-    (dolist (row-point separator-row-point-list)
-      (goto-char row-point)
-      (valign--align-separator-row (valign--guess-table-type)
-                                   valign-separator-row-style
-                                   (reverse rev-list)))))
+                (push (- pos bar-width) rev-list)))))))))
 
 ;;; Mode intergration
 
