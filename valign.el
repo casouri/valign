@@ -277,7 +277,7 @@ Assumes point is on a table."
 
 (defun valign--put-text-property (beg end xpos)
   "Put text property on text from BEG to END.
-The text property asks Emacs do display the text as
+The text property asks Emacs to display the text as
 white space stretching to XPOS, a pixel x position."
   (with-silent-modifications
     (put-text-property
