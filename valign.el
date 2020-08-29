@@ -491,16 +491,16 @@ You need to restart valign mode for this setting to take effect."
                       (search-forward "|")
                       (valign--pixel-width-from-to
                        (match-beginning 0) (match-end 0))))
-         (end (save-excursion (valign--end-of-table) (point)))
-         (column-width-list (valign--calculate-cell-width end))
+         (table-end (save-excursion (valign--end-of-table) (point)))
+         (column-width-list (valign--calculate-cell-width table-end))
          (column-alignment-list (valign--calculate-alignment
-                                 (valign--guess-table-type) end))
+                                 (valign--guess-table-type) table-end))
          row-idx column-idx column-start)
     (ignore row-idx)
-    (valign--clean-text-property (point) end)
+    (valign--clean-text-property (point) table-end)
 
     ;; Start alignment.
-    (valign--do-row row-idx end
+    (valign--do-row row-idx table-end
       (search-forward "|" (line-end-position))
       (if (valign--separator-p)
           (valign--align-separator-row
