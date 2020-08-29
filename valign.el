@@ -481,10 +481,16 @@ You need to restart valign mode for this setting to take effect."
 
 (defun valign-table-1 ()
   "Visually align the table at point."
-  (let (end column-width-list column-idx pos ssw bar-width
-            separator-row-point-list rev-list
-            column-alignment-list at-sep-row right-bar-pos
-            row-idx)
+  (let (end column-width-list column-idx pos
+            column-alignment-list right-bar-pos row-idx
+            (ssw (save-excursion
+                   (search-forward " ")
+                   (valign--pixel-width-from-to
+                    (match-beginning 0) (match-end 0))))
+            (bar-width (save-excursion
+                         (search-forward "|")
+                         (valign--pixel-width-from-to
+                          (match-beginning 0) (match-end 0)))))
     (ignore row-idx)
     ;; ‘separator-row-point-list’ marks the point for each
     ;; separator-row, so we can later come back and align them.
@@ -519,28 +525,12 @@ You need to restart valign mode for this setting to take effect."
                    ;; Pixel width of the cell.
                    (cell-width (valign--cell-width))
                    tab-width tab-start tab-end)
-              ;; single-space-width
-              (unless ssw
-                (setq ssw (save-excursion
-                            (search-forward " ")
-                            (valign--pixel-width-from-to
-                             (match-beginning 0) (match-end 0)))))
-              (unless bar-width
-                (setq bar-width (save-excursion
-                                  (search-forward "|")
-                                  (valign--pixel-width-from-to
-                                   (match-beginning 0) (match-end 0)))))
               ;; Initialize some numbers when we are at a new
               ;; line.  ‘pos’ is the pixel position of the
               ;; current point, i.e., after the left bar.
               (when (eq column-idx 0)
-                (when (valign--separator-p)
-                  (push (point) separator-row-point-list))
                 ;; Render the first bar of the line.
                 (valign--maybe-render-bar (1- (point)))
-                (unless (valign--separator-p)
-                  (setq rev-list nil))
-                (setq at-sep-row (if (valign--separator-p) t nil))
                 (setq pos (valign--pixel-width-from-to
                            (line-beginning-position) (point))))
               ;; Align cell.
@@ -588,9 +578,7 @@ You need to restart valign mode for this setting to take effect."
                                   tab-start (point)
                                   (+ pos tab-width))))))
               ;; Update ‘pos’ for the next cell.
-              (setq pos (+ pos col-width bar-width ssw))
-              (unless at-sep-row
-                (push (- pos bar-width) rev-list)))))))))
+              (setq pos (+ pos col-width bar-width ssw)))))))))
 
 ;;; Mode intergration
 
