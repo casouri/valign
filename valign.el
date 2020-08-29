@@ -137,22 +137,33 @@ cell.  We don’t distinguish between left and center aligned."
           'right
         'left))))
 
-(defmacro valign--do-table (column-idx-sym limit &rest body)
-  "Go to each cell of a table and evaluate BODY.
-In each cell point stops after the left “|”.
-Bind COLUMN-IDX-SYM to the column index (0-based).
-Don’t go over LIMIT."
+(defmacro valign--do-row (row-idx-sym limit &rest body)
+  "Go to each row’s beginning and evaluate BODY.
+At each row, stop at the beginning of the line.  Start from point
+and stop at LIMIT.  ROW-IDX-SYM is bound to each row’s
+index (0-based)."
   (declare (indent 2))
   `(progn
-     (setq ,column-idx-sym -1)
-     (while (and (cl-incf ,column-idx-sym)
-                 (search-forward "|" nil t)
-                 (< (point) ,limit))
-       (if (looking-at "[^|]*\n")
-           ;; We are after the last “|” of a line.
-           (setq ,column-idx-sym -1)
-         ;; Point is after the left “|”.
-         (progn ,@body)))))
+     (setq ,row-idx-sym 0)
+     (while (<= (point) ,limit)
+       (beginning-of-line)
+       ,@body
+       (forward-line)
+       (cl-incf ,row-idx-sym))))
+
+(defmacro valign--do-column (column-idx-sym &rest body)
+  "Go to each column in the row and evaluate BODY.
+Start from point and stop at the end of the line.  Stop after the
+cell bar (“|”) in each iteration.
+COLUMN-IDX-SYM is bound to the index of the column (0-based)."
+  (declare (indent 1))
+  `(progn
+     (setq ,column-idx-sym 0)
+     (while (search-forward "|" (line-end-position) t)
+       ;; Unless we are after the last bar.
+       (unless (looking-at "[^|]*\n")
+         ,@body)
+       (cl-incf ,column-idx-sym))))
 
 (defun valign--alist-to-list (alist)
   "Convert an ALIST ((0 . a) (1 . b) (2 . c)) to (a b c)."
@@ -167,21 +178,23 @@ Don’t go over LIMIT."
   "Return a list of column widths.
 Each column width is the largest cell width of the column.
 Start from point, stop at LIMIT."
-  (let (column-width-alist column-idx)
+  (let (row-idx column-idx column-width-alist)
+    (ignore row-idx)
     (save-excursion
-      (valign--do-table column-idx limit
-        ;; Point is after the left “|”.
-        ;;
-        ;; Calculate this column’s pixel width, record it if it
-        ;; is the largest one for this column.
-        (unless (valign--separator-p)
-          (let ((oldmax (alist-get column-idx column-width-alist))
-                (cell-width (valign--cell-width)))
-            ;; Why “=”: if cell-width is 0 and the whole column is 0,
-            ;; still record it.
-            (if (>= cell-width (or oldmax 0))
-                (setf (alist-get column-idx column-width-alist)
-                      cell-width))))))
+      (valign--do-row row-idx limit
+        (valign--do-column column-idx
+          ;; Point is after the left “|”.
+          ;;
+          ;; Calculate this column’s pixel width, record it if it
+          ;; is the largest one for this column.
+          (unless (valign--separator-p)
+            (let ((oldmax (alist-get column-idx column-width-alist))
+                  (cell-width (valign--cell-width)))
+              ;; Why “=”: if cell-width is 0 and the whole column is 0,
+              ;; still record it.
+              (if (>= cell-width (or oldmax 0))
+                  (setf (alist-get column-idx column-width-alist)
+                        cell-width)))))))
     ;; Turn alist into a list.
     (mapcar (lambda (width) (+ width 16))
             (valign--alist-to-list column-width-alist))))
@@ -190,12 +203,14 @@ Start from point, stop at LIMIT."
   "Return a list of alignments ('left or 'right) for each column.
 TYPE must be 'markdown.  Start at point, stop at LIMIT."
   (ignore type)
-  (let (column-idx column-alignment-alist)
+  (let (row-idx column-idx column-alignment-alist)
+    (ignore row-idx)
     (save-excursion
-      (valign--do-table column-idx limit
-        (when (valign--separator-p)
-          (setf (alist-get column-idx column-alignment-alist)
-                (valign--alignment-from-seperator))))
+      (valign--do-row row-idx limit
+        (valign--do-column column-idx
+          (when (valign--separator-p)
+            (setf (alist-get column-idx column-alignment-alist)
+                  (valign--alignment-from-seperator)))))
       (valign--alist-to-list column-alignment-alist))))
 
 (cl-defmethod valign--calculate-alignment ((type (eql org)) limit)
@@ -205,13 +220,15 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
   ;; Because the widest cell of a column has one space on both side,
   ;; making it impossible to infer the alignment.
   (ignore type)
-  (let (column-idx column-alignment-alist)
+  (let (column-idx column-alignment-alist row-idx)
+    (ignore row-idx)
     (save-excursion
-      (valign--do-table column-idx limit
-        (when (not (valign--separator-p))
-          (setf (alist-get column-idx column-alignment-alist)
-                (cons (valign--cell-alignment)
-                      (alist-get column-idx column-alignment-alist)))))
+      (valign--do-row row-idx limit
+        (valign--do-column column-idx
+          (when (not (valign--separator-p))
+            (setf (alist-get column-idx column-alignment-alist)
+                  (cons (valign--cell-alignment)
+                        (alist-get column-idx column-alignment-alist))))))
       ;; Now we have an alist
       ;; ((0 . (left left right left ...) (1 . (...))))
       ;; For each column, we take the majority.
@@ -464,7 +481,9 @@ You need to restart valign mode for this setting to take effect."
   "Visually align the table at point."
   (let (end column-width-list column-idx pos ssw bar-width
             separator-row-point-list rev-list
-            column-alignment-list at-sep-row right-bar-pos)
+            column-alignment-list at-sep-row right-bar-pos
+            row-idx)
+    (ignore row-idx)
     ;; ‘separator-row-point-list’ marks the point for each
     ;; separator-row, so we can later come back and align them.
     ;; ‘rev-list’ is the reverse list of right positions of each
@@ -480,86 +499,87 @@ You need to restart valign mode for this setting to take effect."
           (valign--calculate-alignment
            (valign--guess-table-type) end))
     ;; Iterate each cell and apply tab stops.
-    (valign--do-table column-idx end
-      (save-excursion
-        ;; Check there is a right bar.
-        (when (save-excursion
-                (search-forward "|" (line-end-position) t)
-                (setq right-bar-pos (match-beginning 0)))
-          ;; Can’t put this in the save-excursion, donno why.
-          ;; Render the right bar of each cell.
-          (valign--maybe-render-bar right-bar-pos)
-          ;; We are after the left bar (“|”).
-          ;; Start aligning this cell.
-          ;;      Pixel width of the column
-          (let* ((col-width (nth column-idx column-width-list))
-                 (alignment (nth column-idx column-alignment-list))
-                 ;; Pixel width of the cell.
-                 (cell-width (valign--cell-width))
-                 tab-width tab-start tab-end)
-            ;; single-space-width
-            (unless ssw (setq ssw (valign--pixel-width-from-to
-                                   (point) (1+ (point)))))
-            (unless bar-width (setq bar-width
-                                    (valign--pixel-width-from-to
-                                     (1- (point)) (point))))
-            ;; Initialize some numbers when we are at a new
-            ;; line.  ‘pos’ is the pixel position of the
-            ;; current point, i.e., after the left bar.
-            (when (eq column-idx 0)
-              (when (valign--separator-p)
-                (push (point) separator-row-point-list))
-              ;; Render the first bar of the line.
-              (valign--maybe-render-bar (1- (point)))
-              (unless (valign--separator-p)
-                (setq rev-list nil))
-              (setq at-sep-row (if (valign--separator-p) t nil))
-              (setq pos (valign--pixel-width-from-to
-                         (line-beginning-position) (point))))
-            ;; Align cell.
-            (cond ((eq cell-width 0)
-                   ;; 1) Empty cell.
-                   (setq tab-start (point))
-                   (skip-chars-forward " ")
-                   (if (< (- (point) tab-start) 2)
+    (valign--do-row row-idx end
+      (valign--do-column column-idx
+        (save-excursion
+          ;; Check there is a right bar.
+          (when (save-excursion
+                  (search-forward "|" (line-end-position) t)
+                  (setq right-bar-pos (match-beginning 0)))
+            ;; Can’t put this in the save-excursion, donno why.
+            ;; Render the right bar of each cell.
+            (valign--maybe-render-bar right-bar-pos)
+            ;; We are after the left bar (“|”).
+            ;; Start aligning this cell.
+            ;;      Pixel width of the column
+            (let* ((col-width (nth column-idx column-width-list))
+                   (alignment (nth column-idx column-alignment-list))
+                   ;; Pixel width of the cell.
+                   (cell-width (valign--cell-width))
+                   tab-width tab-start tab-end)
+              ;; single-space-width
+              (unless ssw (setq ssw (valign--pixel-width-from-to
+                                     (point) (1+ (point)))))
+              (unless bar-width (setq bar-width
+                                      (valign--pixel-width-from-to
+                                       (1- (point)) (point))))
+              ;; Initialize some numbers when we are at a new
+              ;; line.  ‘pos’ is the pixel position of the
+              ;; current point, i.e., after the left bar.
+              (when (eq column-idx 0)
+                (when (valign--separator-p)
+                  (push (point) separator-row-point-list))
+                ;; Render the first bar of the line.
+                (valign--maybe-render-bar (1- (point)))
+                (unless (valign--separator-p)
+                  (setq rev-list nil))
+                (setq at-sep-row (if (valign--separator-p) t nil))
+                (setq pos (valign--pixel-width-from-to
+                           (line-beginning-position) (point))))
+              ;; Align cell.
+              (cond ((eq cell-width 0)
+                     ;; 1) Empty cell.
+                     (setq tab-start (point))
+                     (skip-chars-forward " ")
+                     (if (< (- (point) tab-start) 2)
+                         (valign--put-text-property
+                          tab-start (point) (+ pos col-width ssw))
+                       ;; When possible, we try to add two tabs
+                       ;; and the point can appear in the middle
+                       ;; of the cell, instead of on the very
+                       ;; left or very right.
                        (valign--put-text-property
-                        tab-start (point) (+ pos col-width ssw))
-                     ;; When possible, we try to add two tabs
-                     ;; and the point can appear in the middle
-                     ;; of the cell, instead of on the very
-                     ;; left or very right.
-                     (valign--put-text-property
-                      tab-start
-                      (1+ tab-start)
-                      (+ pos (/ col-width 2) ssw))
-                     (valign--put-text-property
-                      (1+ tab-start) (point)
-                      (+ pos col-width ssw))))
-                  ;; 2) Separator row.  We don’t align the separator
-                  ;; row yet, but will come back to it.
-                  ((valign--separator-p) nil)
-                  ;; 3) Normal cell.
-                  (t (pcase alignment
-                       ;; 3.1) Align a left-aligned cell.
-                       ('left (search-forward "|" nil t)
-                              (backward-char)
-                              (setq tab-end (point))
-                              (skip-chars-backward " ")
-                              (valign--put-text-property
-                               (point) tab-end
-                               (+ pos col-width ssw)))
-                       ;; 3.2) Align a right-aligned cell.
-                       ('right (setq tab-width
-                                     (- col-width cell-width))
-                               (setq tab-start (point))
-                               (skip-chars-forward " ")
-                               (valign--put-text-property
-                                tab-start (point)
-                                (+ pos tab-width))))))
-            ;; Update ‘pos’ for the next cell.
-            (setq pos (+ pos col-width bar-width ssw))
-            (unless at-sep-row
-              (push (- pos bar-width) rev-list))))))
+                        tab-start
+                        (1+ tab-start)
+                        (+ pos (/ col-width 2) ssw))
+                       (valign--put-text-property
+                        (1+ tab-start) (point)
+                        (+ pos col-width ssw))))
+                    ;; 2) Separator row.  We don’t align the separator
+                    ;; row yet, but will come back to it.
+                    ((valign--separator-p) nil)
+                    ;; 3) Normal cell.
+                    (t (pcase alignment
+                         ;; 3.1) Align a left-aligned cell.
+                         ('left (search-forward "|" nil t)
+                                (backward-char)
+                                (setq tab-end (point))
+                                (skip-chars-backward " ")
+                                (valign--put-text-property
+                                 (point) tab-end
+                                 (+ pos col-width ssw)))
+                         ;; 3.2) Align a right-aligned cell.
+                         ('right (setq tab-width
+                                       (- col-width cell-width))
+                                 (setq tab-start (point))
+                                 (skip-chars-forward " ")
+                                 (valign--put-text-property
+                                  tab-start (point)
+                                  (+ pos tab-width))))))
+              ;; Update ‘pos’ for the next cell.
+              (setq pos (+ pos col-width bar-width ssw))
+              (unless at-sep-row
+                (push (- pos bar-width) rev-list)))))))
     ;; After aligning all rows, align the separator row.
     (dolist (row-point separator-row-point-list)
       (goto-char row-point)
