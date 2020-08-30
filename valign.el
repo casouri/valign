@@ -75,6 +75,58 @@ Doesn’t check if we are in a cell."
 ;;                   (buffer-substring p (1- (point))))
 ;;     'right 'left)
 
+(defun valign--cell-content-config ()
+  "Return (CELL-BEG CONTENT-BEG CONTENT-END CELL-END).
+CELL-BEG is after the left bar, CELL-END is before the right bar.
+CELL-CONTENT contains the actual non-white-space content,
+possibly with a single white space padding on the either side, if
+there are more than one white space on that side.
+
+If the cell is empty, CONTENT-BEG is
+
+    (min (CELL-BEG + 1) CELL-END)
+
+CONTENT-END is
+
+    (max (CELL-END - 1) CELL-BEG)
+
+Assumes point is after the left bar (“|”).  Assumes there is a
+right bar."
+  (save-excursion
+    (let ((cell-beg (point))
+          (cell-end (save-excursion
+                      (search-forward "|" (line-end-position))
+                      (match-beginning 0)))
+          ;; `content-beg-strict' is the beginning of the content
+          ;; excluding any white space. Same for `content-end-strict'.
+          content-beg-strict content-end-strict)
+      (if (save-excursion (skip-chars-forward " ") (looking-at-p "|"))
+          ;; Empty cell.
+          (list cell-beg
+                (min (1+ cell-beg) cell-end)
+                (max (1- cell-end) cell-beg)
+                cell-end)
+        ;; Non-empty cell.
+        (skip-chars-forward " ")
+        (setq content-beg-strict (point))
+        (goto-char cell-end)
+        (skip-chars-backward " ")
+        (setq content-end-strict (point))
+        ;; Calculate delimiters. Basically, we try to preserve a white
+        ;; space on the either side of the content, i.e., include them
+        ;; in (BEG . END). Because if you are typing in a cell and
+        ;; type a space, you probably want valign to keep that space
+        ;; as cell content, rather than to consider it as part of the
+        ;; padding and add overlay over it.
+        (list cell-beg
+              (if (= (- content-beg-strict cell-beg) 1)
+                  content-beg-strict
+                (1- content-beg-strict))
+              (if (= (- cell-end content-end-strict) 1)
+                  content-end-strict
+                (1+ content-end-strict))
+              cell-end)))))
+
 (defun valign--cell-width ()
   "Return the pixel width of the cell at point.
 Assumes point is after the left bar (“|”).
@@ -88,18 +140,8 @@ Return nil if not in a cell."
   ;;      EMPTY     := <SPACE>+
   ;;      NON-EMPTY := <SPACE>+<NON-SPACE>+<SPACE>+
   ;;      DELIM     := | or +
-  (let (start)
-    (save-excursion
-      (skip-chars-forward " ")
-      (setq start (point))
-      (if (looking-at-p "[|]")
-          0
-        (if (not (search-forward "|" nil t))
-            (signal 'valign-bad-cell nil)
-          ;; We are at the right “|”
-          (goto-char (match-beginning 0))
-          (skip-chars-backward " ")
-          (valign--pixel-width-from-to start (point)))))))
+  (pcase-let ((`(,_a ,beg ,end ,_b) (valign--cell-content-config)))
+    (valign--pixel-width-from-to beg end)))
 
 ;; We used to use a custom functions that calculates the pixel text
 ;; width that doesn’t require a live window.  However that function
@@ -463,17 +505,17 @@ You need to restart valign mode for this setting to take effect."
          row-idx column-idx column-start)
     (ignore row-idx)
 
-    ;; Start alignment.
+    ;; Align each row.
     (valign--do-row row-idx table-end
       (search-forward "|" (line-end-position))
       (if (valign--separator-p)
+          ;; Separator row.
           (valign--align-separator-row
            (valign--guess-table-type)
            valign-separator-row-style
            column-width-list)
 
-        ;; Not separator row, align each cell.  Initialize some
-        ;; numbers when we are at a new line.  ‘column-start’ is the
+        ;; Not separator row, align each cell. ‘column-start’ is the
         ;; pixel position of the current point, i.e., after the left
         ;; bar.
         (setq column-start (valign--pixel-width-from-to
@@ -487,50 +529,33 @@ You need to restart valign mode for this setting to take effect."
             (let* ((col-width (nth column-idx column-width-list))
                    (alignment (nth column-idx column-alignment-list))
                    ;; Pixel width of the cell.
-                   (cell-width (valign--cell-width))
-                   tab-width tab-start tab-end)
+                   (cell-width (valign--cell-width)))
               ;; Align cell.
               (cl-labels ((valign--put-ov
                            (beg end xpos)
                            (valign--put-overlay beg end 'display
                                                 (valign--space xpos))))
-                (cond ((eq cell-width 0)
-                       ;; 1) Empty cell.
-                       (setq tab-start (point))
-                       (skip-chars-forward " ")
-                       (if (< (- (point) tab-start) 2)
-                           (valign--put-ov
-                            tab-start (point)
-                            (+ column-start col-width space-width))
-                         ;; When possible, we try to add two tabs
-                         ;; and the point can appear in the middle
-                         ;; of the cell, instead of on the very
-                         ;; left or very right.
-                         (valign--put-ov
-                          tab-start
-                          (1+ tab-start)
-                          (+ column-start (/ col-width 2) space-width))
-                         (valign--put-ov
-                          (1+ tab-start) (point)
-                          (+ column-start col-width space-width))))
-                      ;; 2) Normal cell.
-                      (t (pcase alignment
-                           ;; 2.1) Align a left-aligned cell.
-                           ('left (search-forward "|" nil t)
-                                  (backward-char)
-                                  (setq tab-end (point))
-                                  (skip-chars-backward " ")
-                                  (valign--put-ov
-                                   (point) tab-end
-                                   (+ column-start col-width space-width)))
-                           ;; 2.2) Align a right-aligned cell.
-                           ('right (setq tab-width
-                                         (- col-width cell-width))
-                                   (setq tab-start (point))
-                                   (skip-chars-forward " ")
-                                   (valign--put-ov
-                                    tab-start (point)
-                                    (+ column-start tab-width)))))))
+                (pcase-let ((`(,cell-beg
+                               ,content-beg
+                               ,content-end
+                               ,cell-end)
+                             (valign--cell-content-config)))
+                  (if (= cell-beg content-beg)
+                      ;; This cell has only one space.
+                      (valign--put-ov
+                       cell-beg cell-end
+                       (+ column-start col-width space-width))
+                    ;; A normal cell.
+                    (pcase alignment
+                      ;; Align a left-aligned cell.
+                      ('left (valign--put-ov
+                              content-end cell-end
+                              (+ column-start col-width space-width)))
+                      ;; Align a right-aligned cell.
+                      ('right (valign--put-ov
+                               cell-beg content-beg
+                               (+ column-start
+                                  (- col-width cell-width))))))))
               ;; Update ‘column-start’ for the next cell.
               (setq column-start (+ column-start
                                     col-width
