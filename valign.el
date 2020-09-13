@@ -489,11 +489,13 @@ You need to restart valign mode for this setting to take effect."
   "Visually align the table at point."
   (valign--beginning-of-table)
   (let* ((space-width (save-excursion
-                        (search-forward " ")
+                        (or (search-forward " " nil t)
+                            (search-backward " " nil t))
                         (valign--pixel-width-from-to
                          (match-beginning 0) (match-end 0))))
          (bar-width (save-excursion
-                      (search-forward "|")
+                      (or (search-forward "|" nil t)
+                          (search-backward "|" nil t))
                       (valign--pixel-width-from-to
                        (match-beginning 0) (match-end 0))))
          (table-end (save-excursion (valign--end-of-table) (point)))
