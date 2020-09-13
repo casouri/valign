@@ -483,7 +483,8 @@ You need to restart valign mode for this setting to take effect."
             (signal 'valign-not-on-table nil))
         (valign-table-1))
     (valign-early-termination nil)
-    ((valign-bad-cell valign-not-gui valign-not-on-table) nil)))
+    ((valign-bad-cell valign-not-gui valign-not-on-table) nil)
+    (search-failed nil)))
 
 (defun valign-table-1 ()
   "Visually align the table at point."
