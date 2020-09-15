@@ -655,24 +655,27 @@ FLAG is the same as in ‘org-flag-region’."
   :require 'valign
   :group 'valign
   :lighter valign-lighter
-  (if (and valign-mode window-system)
-      (progn
-        (add-hook 'jit-lock-functions #'valign-region 98 t)
-        (dolist (fn '(org-table--align-field
-                      markdown-table-align))
-          (advice-add fn :after #'valign--tab-advice))
-        (dolist (fn '(text-scale-increase
-                      text-scale-decrease
-                      org-agenda-finalize-hook
-                      org-toggle-inline-images))
-          (advice-add fn :after #'valign--buffer-advice))
-        (dolist (fn '(org-flag-region outline-flag-region))
-          (advice-add fn :after #'valign--flag-region-advice))
-        (if valign-fancy-bar (cursor-sensor-mode))
-        (jit-lock-refontify))
-    (remove-hook 'jit-lock-functions #'valign-region t)
-    (valign-reset-buffer)
-    (cursor-sensor-mode -1)))
+  (if (not (display-graphic-p))
+      (when valign-mode
+        (message "Valign mode has no effect in non-graphical display"))
+    (if valign-mode
+        (progn
+          (add-hook 'jit-lock-functions #'valign-region 98 t)
+          (dolist (fn '(org-table--align-field
+                        markdown-table-align))
+            (advice-add fn :after #'valign--tab-advice))
+          (dolist (fn '(text-scale-increase
+                        text-scale-decrease
+                        org-agenda-finalize-hook
+                        org-toggle-inline-images))
+            (advice-add fn :after #'valign--buffer-advice))
+          (dolist (fn '(org-flag-region outline-flag-region))
+            (advice-add fn :after #'valign--flag-region-advice))
+          (if valign-fancy-bar (cursor-sensor-mode))
+          (jit-lock-refontify))
+      (remove-hook 'jit-lock-functions #'valign-region t)
+      (valign-reset-buffer)
+      (cursor-sensor-mode -1))))
 
 (provide 'valign)
 
