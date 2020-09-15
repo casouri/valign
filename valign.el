@@ -489,6 +489,8 @@ You need to restart valign mode for this setting to take effect."
 (defun valign-table-1 ()
   "Visually align the table at point."
   (valign--beginning-of-table)
+  (when (text-property-any (point) (point) 'valign-init t)
+    (signal 'valign-early-termination nil))
   (let* ((space-width (save-excursion
                         (or (search-forward " " nil t)
                             (search-backward " " nil t))
@@ -499,6 +501,7 @@ You need to restart valign mode for this setting to take effect."
                           (search-backward "|" nil t))
                       (valign--pixel-width-from-to
                        (match-beginning 0) (match-end 0))))
+         (table-beg (point))
          (table-end (save-excursion (valign--end-of-table) (point)))
          ;; Very hacky, but..
          (_ (valign--clean-text-property (point) table-end))
@@ -563,7 +566,8 @@ You need to restart valign mode for this setting to take effect."
               (setq column-start (+ column-start
                                     col-width
                                     bar-width
-                                    space-width)))))))))
+                                    space-width)))))))
+    (put-text-property table-beg table-end 'valign-init t)))
 
 ;;; Mode intergration
 
@@ -581,8 +585,10 @@ Force align if FORCE non-nil."
         (goto-char beg)
         (while (and (search-forward "|" nil t)
                     (< (point) end))
-          (with-demoted-errors "Valign error when aligning table: %s"
-            (valign-table))
+          (condition-case err
+              (valign-table)
+            (error (message "Error when aligning table: %s"
+                            (error-message-string err))))
           (valign--end-of-table)))))
   (cons 'jit-lock-bounds (cons beg end)))
 
@@ -594,13 +600,15 @@ Force align if FORCE non-nil."
 ;; When an org link is in an outline fold, it’s full length
 ;; is used, when the subtree is unveiled, org link only shows
 ;; part of it’s text, so we need to re-align.  This function
-;; runs before the region is flagged. When the text
+;; runs after the region is flagged. When the text
 ;; is shown, jit-lock will make valign realign the text.
 (defun valign--flag-region-advice (beg end flag &optional _)
   "Valign hook, realign table between BEG and END.
 FLAG is the same as in ‘org-flag-region’."
   (when (and valign-mode (not flag))
-    (valign-region beg end)))
+    (with-silent-modifications
+      (put-text-property beg end 'valign-init nil)
+      (put-text-property beg end 'fontified nil))))
 
 (defun valign--tab-advice (&rest _)
   "Force realign after tab so user can force realign."
@@ -610,7 +618,8 @@ FLAG is the same as in ‘org-flag-region’."
                  (beg (progn (valign--beginning-of-table) (point)))
                  (end (progn (valign--end-of-table) (point))))
         (with-silent-modifications
-          (put-text-property beg end 'fontified nil))))))
+          (put-text-property beg end 'valign-init nil)
+          (valign-table))))))
 
 (defun valign-reset-buffer ()
   "Remove alignment in the buffer."
