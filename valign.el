@@ -656,7 +656,7 @@ FLAG is the same as in ‘org-flag-region’."
         (add-hook 'jit-lock-functions #'valign-region 98 t)
         (dolist (fn '(org-table--align-field
                       markdown-table-align))
-          (advice-add fn :before #'valign--tab-advice))
+          (advice-add fn :after #'valign--tab-advice))
         (dolist (fn '(text-scale-increase
                       text-scale-decrease
                       org-agenda-finalize-hook
