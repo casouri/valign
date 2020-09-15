@@ -475,7 +475,7 @@ You need to restart valign mode for this setting to take effect."
 (defun valign-table ()
   "Visually align the table at point."
   (interactive)
-  (condition-case nil
+  (condition-case err
       (save-excursion
         (if (not window-system)
             (signal 'valign-not-gui nil))
@@ -483,8 +483,12 @@ You need to restart valign mode for this setting to take effect."
             (signal 'valign-not-on-table nil))
         (valign-table-1))
     (valign-early-termination nil)
-    ((valign-bad-cell valign-not-gui valign-not-on-table) nil)
-    (search-failed nil)))
+    ((valign-bad-cell search-failed error)
+     (valign--clean-text-property
+      (save-excursion (valign--beginning-of-table) (point))
+      (save-excursion (valign--end-of-table) (point)))
+     (when (eq (car err) 'error)
+       (error (error-message-string err))))))
 
 (defun valign-table-1 ()
   "Visually align the table at point."
