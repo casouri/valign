@@ -413,7 +413,7 @@ Assumes point is on the right bar or plus sign."
   (when (eq (char-before end) ?:)
     (setq end (1- end)
           right-pos (- right-pos
-                       (valign--glyph-width-at-point (1- end)))))
+                       (valign--pixel-width-from-to (1- end) end))))
   ;; End of Markdown
   (valign--put-overlay beg end
                        'display (valign--space right-pos)
