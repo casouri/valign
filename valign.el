@@ -506,7 +506,7 @@ You need to restart valign mode for this setting to take effect."
          (table-beg (point))
          (table-end (save-excursion (valign--end-of-table) (point)))
          ;; Very hacky, but..
-         (_ (valign--clean-text-property (point) table-end))
+         (_ (valign--clean-text-property table-beg table-end))
          (column-width-list (valign--calculate-cell-width table-end))
          (column-alignment-list (valign--calculate-alignment
                                  (valign--guess-table-type) table-end))
