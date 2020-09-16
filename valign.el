@@ -320,7 +320,7 @@ Assumes point is on a table."
 (defun valign--put-overlay (beg end &rest props)
   "Put overlay between BEG and END.
 PROPS contains properties and values."
-  (let ((ov (make-overlay beg end)))
+  (let ((ov (make-overlay beg end nil t nil)))
     (overlay-put ov 'valign t)
     (overlay-put ov 'evaporate t)
     (while props
