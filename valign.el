@@ -635,7 +635,8 @@ FLAG is the same as in ‘org-flag-region’."
 (defun valign-remove-advice ()
   "Remove advices added by valign."
   (interactive)
-  (dolist (fn '(org-table--align-field
+  (dolist (fn '(org-cycle
+                org-table-blank-field
                 markdown-table-align))
     (advice-remove fn #'valign--tab-advice))
   (dolist (fn '(text-scale-increase
@@ -659,7 +660,15 @@ FLAG is the same as in ‘org-flag-region’."
     (if valign-mode
         (progn
           (add-hook 'jit-lock-functions #'valign-region 98 t)
-          (dolist (fn '(org-table--align-field
+          (dolist (fn '(org-cycle
+                        ;; Why this function?  If you tab into an org
+                        ;; field (cell) and start typing right away,
+                        ;; org clears that field for you with this
+                        ;; function.  The problem is, this functions
+                        ;; messes up the overlay and makes the bar
+                        ;; invisible.  So we have to fix the overlay
+                        ;; after this function.
+                        org-table-blank-field
                         markdown-table-align))
             (advice-add fn :after #'valign--tab-advice))
           (dolist (fn '(text-scale-increase
