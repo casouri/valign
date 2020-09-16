@@ -250,10 +250,15 @@ TYPE must be 'markdown.  Start at point, stop at LIMIT."
     (ignore row-idx)
     (save-excursion
       (valign--do-row row-idx limit
-        (valign--do-column column-idx
-          (when (valign--separator-p)
+        (when (valign--separator-p)
+          (valign--do-column column-idx
             (setf (alist-get column-idx column-alignment-alist)
-                  (valign--alignment-from-seperator)))))
+                  (valign--alignment-from-seperator))))))
+    (if (not column-alignment-alist)
+        (save-excursion
+          (valign--do-column column-idx
+            (push 'left column-alignment-alist))
+          column-alignment-alist)
       (valign--alist-to-list column-alignment-alist))))
 
 (cl-defmethod valign--calculate-alignment ((type (eql org)) limit)
@@ -638,7 +643,7 @@ FLAG is the same as in ‘org-flag-region’."
   (interactive)
   (dolist (fn '(org-cycle
                 org-table-blank-field
-                markdown-table-align))
+                markdown-cycle))
     (advice-remove fn #'valign--tab-advice))
   (dolist (fn '(text-scale-increase
                 text-scale-decrease
@@ -670,7 +675,7 @@ FLAG is the same as in ‘org-flag-region’."
                         ;; invisible.  So we have to fix the overlay
                         ;; after this function.
                         org-table-blank-field
-                        markdown-table-align))
+                        markdown-cycle))
             (advice-add fn :after #'valign--tab-advice))
           (dolist (fn '(text-scale-increase
                         text-scale-decrease
