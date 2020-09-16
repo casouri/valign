@@ -569,7 +569,8 @@ You need to restart valign mode for this setting to take effect."
                                     col-width
                                     bar-width
                                     space-width)))))))
-    (put-text-property table-beg table-end 'valign-init t)))
+    (with-silent-modifications
+      (put-text-property table-beg table-end 'valign-init t))))
 
 ;;; Mode intergration
 
@@ -679,6 +680,8 @@ FLAG is the same as in ‘org-flag-region’."
           (dolist (fn '(org-flag-region outline-flag-region))
             (advice-add fn :after #'valign--flag-region-advice))
           (if valign-fancy-bar (cursor-sensor-mode))
+          (with-silent-modifications
+            (put-text-property (point-min) (point-max) 'valign-init nil))
           (jit-lock-refontify))
       (remove-hook 'jit-lock-functions #'valign-region t)
       (valign-reset-buffer)
