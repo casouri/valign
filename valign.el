@@ -25,8 +25,8 @@
 ;; style.
 ;;
 ;; TODO
-;; - Support org-ident. It uses line-prefix, and we don’t support it.
-;; - Hided links in markdown still occupy the full length of the link,
+;; - Support org-indent.  It uses line-prefix, and we don’t support it.
+;; - Hidden links in markdown still occupy the full length of the link
 ;;   because it uses character composition, which we don’t support.
 
 ;;; Code:
