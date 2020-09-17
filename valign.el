@@ -61,20 +61,6 @@ Doesn’t check if we are in a cell."
             'right
           'left)))))
 
-;; (if (string-match (rx (seq (* " ")
-;;                            ;; e.g., “5.”, “5.4”
-;;                            (or (seq (? (or "-" "+"))
-;;                                     (+ digit)
-;;                                     (? "\\.")
-;;                                     (* digit))
-;;                                ;; e.g., “.5”
-;;                                (seq (? (or "-" "+"))
-;;                                     "\\."
-;;                                     (* digit)))
-;;                            (* " ")))
-;;                   (buffer-substring p (1- (point))))
-;;     'right 'left)
-
 (defun valign--cell-content-config ()
   "Return (CELL-BEG CONTENT-BEG CONTENT-END CELL-END).
 CELL-BEG is after the left bar, CELL-END is before the right bar.
