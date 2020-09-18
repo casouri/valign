@@ -589,7 +589,9 @@ Force align if FORCE non-nil."
 (defvar valign-mode)
 (defun valign--buffer-advice (&rest _)
   "Realign whole buffer."
-  (when valign-mode (valign-region)))
+  (when valign-mode
+    (put-text-property (point-min) (point-max) 'valign-init nil)
+    (valign-region)))
 
 ;; When an org link is in an outline fold, it’s full length
 ;; is used, when the subtree is unveiled, org link only shows
@@ -670,10 +672,12 @@ FLAG is the same as in ‘org-flag-region’."
             (advice-add fn :after #'valign--buffer-advice))
           (dolist (fn '(org-flag-region outline-flag-region))
             (advice-add fn :after #'valign--flag-region-advice))
+          (add-hook 'org-indent-mode-hook #'valign--buffer-advice 0 t)
           (if valign-fancy-bar (cursor-sensor-mode))
           (with-silent-modifications
             (put-text-property (point-min) (point-max) 'valign-init nil))
           (jit-lock-refontify))
+      (remove-hook 'org-indent-mode-hook #'valign--buffer-advice t)
       (remove-hook 'jit-lock-functions #'valign-region t)
       (valign-reset-buffer)
       (cursor-sensor-mode -1))))
