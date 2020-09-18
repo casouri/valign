@@ -370,6 +370,12 @@ before event, ACTION is either 'entered or 'left."
       (when (overlay-get ov 'valign)
         (delete-overlay ov)))))
 
+(defun valign--glyph-width-of (string point)
+  "Return the pixel width of STRING with font at POINT."
+  (aref (aref (font-get-glyphs (font-at point) 0 (length string) string)
+              0)
+        4))
+
 (cl-defmethod valign--align-separator-row
   (type (style (eql single-column)) column-width-list)
   "Align the separator row (|---+---|) as “|---------|”.
@@ -380,7 +386,7 @@ STYLE is 'single-column.  COLUMN-WIDTH-LIST is returned from
   (ignore type style)
   (let* ((p (point))
          (column-count (length column-width-list))
-         (bar-width (valign--pixel-width-from-to (1- (point)) (point)))
+         (bar-width (valign--glyph-width-of "|" p))
          ;; Position of the right-most bar.
          (total-width (+ (apply #'+ column-width-list)
                          (* bar-width (1+ column-count)))))
@@ -421,11 +427,8 @@ Assumes point is on the right bar or plus sign."
 TYPE can be 'org-mode or 'markdown-mode, STYLE is 'multi-column.
 COLUMN-WIDTH-LIST is returned from `valign--calculate-cell-width'."
   (ignore type style)
-  (let ((bar-width (valign--pixel-width-from-to (1- (point)) (point)))
-        (space-width (save-excursion
-                       (search-forward " ")
-                       (valign--pixel-width-from-to
-                        (match-beginning 0) (match-end 0))))
+  (let ((bar-width (valign--glyph-width-of "|" (point)))
+        (space-width (valign--glyph-width-of " " (point)))
         (column-start (point))
         (col-idx 0)
         (pos (valign--pixel-width-from-to
@@ -489,16 +492,8 @@ You need to restart valign mode for this setting to take effect."
 (defun valign-table-1 ()
   "Visually align the table at point."
   (valign--beginning-of-table)
-  (let* ((space-width (save-excursion
-                        (or (search-forward " " nil t)
-                            (search-backward " " nil t))
-                        (valign--pixel-width-from-to
-                         (match-beginning 0) (match-end 0))))
-         (bar-width (save-excursion
-                      (or (search-forward "|" nil t)
-                          (search-backward "|" nil t))
-                      (valign--pixel-width-from-to
-                       (match-beginning 0) (match-end 0))))
+  (let* ((space-width (valign--glyph-width-of " " (point)))
+         (bar-width (valign--glyph-width-of "|" (point)))
          (table-beg (point))
          (table-end (save-excursion (valign--end-of-table) (point)))
          ;; Very hacky, but..
