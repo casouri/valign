@@ -24,8 +24,8 @@
 ;; |           |.  Customize ‘valign-separator-row-style’ to set a
 ;; style.
 ;;
-;; TODO
-;; - Support org-indent.  It uses line-prefix, and we don’t support it.
+;; TODO:
+;;
 ;; - Hidden links in markdown still occupy the full length of the link
 ;;   because it uses character composition, which we don’t support.
 
@@ -134,18 +134,23 @@ Return nil if not in a cell."
 ;; has some limitations, including not working right with face remapping.
 ;; With this function we can avoid some of them.  However we still can’t
 ;; get the true tab width, see comment in ‘valgn--tab-width’ for more.
-(defun valign--pixel-width-from-to (from to)
+(defun valign--pixel-width-from-to (from to &optional with-prefix)
   "Return the width of the glyphs from FROM (inclusive) to TO (exclusive).
-The buffer has to be in a live window.  FROM has to be less than TO.
-Unlike ‘valign--glyph-width-at-point’, this function can properly
-calculate images pixel width.  Valign display properties must be
-cleaned before using this."
-  (- (car (window-text-pixel-size
-           (get-buffer-window (current-buffer)) from to))
-     ;; FIXME: Workaround.
-     (if (bound-and-true-p display-line-numbers-mode)
-         (line-number-display-width 'pixel)
-       0)))
+The buffer has to be in a live window.  FROM has to be less than
+TO and they should be on the same line.  Valign display
+properties must be cleaned before using this.
+
+If WITH-PREFIX is non-nil, don’t subtract the width of line
+prefix."
+  (let ((window (get-buffer-window)))
+    (- (car (window-text-pixel-size window from to))
+       ;; This computes the prefix width.  This trick doesn’t seem work
+       ;; if the point is at the beginning of a line.
+       (if with-prefix 0 (car (window-text-pixel-size window to to)))
+       ;; FIXME: Workaround.
+       (if (bound-and-true-p display-line-numbers-mode)
+           (line-number-display-width 'pixel)
+         0))))
 
 (defun valign--separator-p ()
   "If the current cell is actually a separator.
@@ -424,7 +429,7 @@ COLUMN-WIDTH-LIST is returned from `valign--calculate-cell-width'."
         (column-start (point))
         (col-idx 0)
         (pos (valign--pixel-width-from-to
-              (line-beginning-position) (point))))
+              (line-beginning-position) (point) t)))
     (while (re-search-forward "[+|]" (line-end-position) t)
       (let ((column-width (nth col-idx column-width-list)))
         (valign--separator-row-add-overlay
@@ -518,7 +523,7 @@ You need to restart valign mode for this setting to take effect."
         ;; pixel position of the current point, i.e., after the left
         ;; bar.
         (setq column-start (valign--pixel-width-from-to
-                            (line-beginning-position) (point)))
+                            (line-beginning-position) (point) t))
         (valign--maybe-render-bar (1- (point)))
         (valign--do-column column-idx
           (save-excursion

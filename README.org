@@ -10,8 +10,6 @@ To use this package, load it and add ~valign-mode~ to ~org-mode-hook~ or ~markdo
 [[./default.png]]
 
 *Know problems:*
-- Customizing ~org-table~ face seems to mess up the separator (it will disappear).
-- ~org-indent~ breaks the alignment. It uses line-prefix, and we don’t support it right now.
 - Hidden links in markdown still occupy the full length of the link, because it uses character composition which we don’t support now.
 - Rendering large tables (≥100 lines) is laggy.
 
