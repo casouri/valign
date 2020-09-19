@@ -29,6 +29,17 @@
 ;; - Hidden links in markdown still occupy the full length of the link
 ;;   because it uses character composition, which we don’t support.
 
+;;; Developer:
+;;
+;; We decide to re-align in jit-lock hook, that means any change that
+;; causes refontification will trigger re-align.  This may seem
+;; inefficient and unnecessary, but there are just too many things
+;; that can mess up a table’s alignment.  Therefore it is the most
+;; reliable to re-align every time there is a refontification.
+;; However, we do have a small optimization for typing in a table: if
+;; the last command is 'self-insert-command', we don’t realign.  That
+;; should improve the typing experience in large tables.
+
 ;;; Code:
 ;;
 
@@ -516,12 +527,12 @@ You need to restart valign mode for this setting to take effect."
 If FORCE non-nil, force align."
   (condition-case err
       (save-excursion
-        (when (or force
-                  (and (display-graphic-p)
-                       (valign--at-table-p)
-                       (progn (valign--beginning-of-table)
-                              (text-property-any
-                               (point) (1+ (point)) 'valign-init nil))))
+        (when (and (display-graphic-p)
+                   (valign--at-table-p)
+                   (or force
+                       (not (memq this-command
+                                  '(self-insert-command
+                                    org-self-insert-command)))))
           (valign-table-1)))
     ((valign-bad-cell search-failed error)
      (valign--clean-text-property
@@ -600,9 +611,7 @@ If FORCE non-nil, force align."
               (setq column-start (+ column-start
                                     col-width
                                     bar-width
-                                    space-width)))))))
-    (with-silent-modifications
-      (put-text-property table-beg table-end 'valign-init t))))
+                                    space-width)))))))))
 
 ;;; Mode intergration
 
@@ -631,7 +640,6 @@ Force align if FORCE non-nil."
 (defun valign--buffer-advice (&rest _)
   "Realign whole buffer."
   (when valign-mode
-    (put-text-property (point-min) (point-max) 'valign-init nil)
     (valign-region)))
 
 ;; When an org link is in an outline fold, it’s full length
@@ -644,17 +652,13 @@ Force align if FORCE non-nil."
 FLAG is the same as in ‘org-flag-region’."
   (when (and valign-mode (not flag))
     (with-silent-modifications
-      (put-text-property beg end 'valign-init nil)
       (put-text-property beg end 'fontified nil))))
 
 (defun valign--tab-advice (&rest _)
   "Force realign after tab so user can force realign."
-  (when valign-mode
-    (save-excursion
-      (when-let ((on-table (valign--at-table-p))
-                 (beg (progn (valign--beginning-of-table) (point)))
-                 (end (progn (valign--end-of-table) (point))))
-        (valign-table)))))
+  (when (and valign-mode
+             (valign--at-table-p))
+    (valign-table)))
 
 (defun valign-reset-buffer ()
   "Remove alignment in the buffer."
