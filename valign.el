@@ -623,7 +623,8 @@ Force align if FORCE non-nil."
   ;; We only align when this buffer is in a live window, because we
   ;; need ‘window-text-pixel-size’ to calculate text size.
   (let ((beg (or beg (point-min)))
-        (end (or end (point-max))))
+        (end (or end (point-max)))
+        (fontified-end end))
     (when (window-live-p (get-buffer-window nil (selected-frame)))
       (save-excursion
         (goto-char beg)
@@ -633,8 +634,9 @@ Force align if FORCE non-nil."
               (valign-table-maybe)
             (error (message "Error when aligning table: %s"
                             (error-message-string err))))
-          (valign--end-of-table)))))
-  (cons 'jit-lock-bounds (cons beg end)))
+          (valign--end-of-table)
+          (setq fontified-end (point)))))
+    (cons 'jit-lock-bounds (cons beg (max end fontified-end)))))
 
 (defvar valign-mode)
 (defun valign--buffer-advice (&rest _)
