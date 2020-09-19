@@ -120,7 +120,7 @@ Assumes point is after the left bar (“|”)."
     (and (skip-chars-forward " ")
          (looking-at "|"))))
 
-(defun valign--cell-width ()
+(defun valign--cell-content-width ()
   "Return the pixel width of the cell at point.
 Assumes point is after the left bar (“|”).
 Return nil if not in a cell."
@@ -133,18 +133,22 @@ Return nil if not in a cell."
   ;;      EMPTY     := <SPACE>+
   ;;      NON-EMPTY := <SPACE>+<NON-SPACE>+<SPACE>+
   ;;      DELIM     := | or +
-  ;;
-  ;; Sometimes, because of Org's table alignment, empty cell is longer
-  ;; than non-empty cell.  This usually happens with CJK text, because
-  ;; CJK characters are shorter than 2x ASCII character but Org treats
-  ;; CJK characters as 2 ASCII characters when aligning.  And if you
-  ;; have 16 CJK char in one cell, Org uses 32 ASCII spaces for the
-  ;; empty cell, which is longer than 16 CJK chars.  So better regard
-  ;; empty cell as 0-width rather than measuring it's white spaces.
-  (if (valign--cell-empty-p)
-      0
-    (pcase-let ((`(,_a ,beg ,end ,_b) (valign--cell-content-config)))
-      (valign--pixel-width-from-to beg end))))
+  (pcase-let ((`(,_a ,beg ,end ,_b) (valign--cell-content-config)))
+    (valign--pixel-width-from-to beg end)))
+
+;; Sometimes, because of Org's table alignment, empty cell is longer
+;; than non-empty cell.  This usually happens with CJK text, because
+;; CJK characters are shorter than 2x ASCII character but Org treats
+;; CJK characters as 2 ASCII characters when aligning.  And if you
+;; have 16 CJK char in one cell, Org uses 32 ASCII spaces for the
+;; empty cell, which is longer than 16 CJK chars.  So better regard
+;; empty cell as 0-width rather than measuring it's white spaces.
+(defun valign--cell-nonempty-width ()
+  "Return the pixel width of the cell at point.
+If the cell is empty, return 0.  Otherwise return cell content’s
+width."
+  (if (valign--cell-empty-p) 0
+    (valign--cell-content-width)))
 
 ;; We used to use a custom functions that calculates the pixel text
 ;; width that doesn’t require a live window.  However that function
@@ -254,7 +258,7 @@ Start from point, stop at LIMIT."
           ;; is the largest one for this column.
           (unless (valign--separator-p)
             (let ((oldmax (alist-get column-idx column-width-alist))
-                  (cell-width (valign--cell-width)))
+                  (cell-width (valign--cell-nonempty-width)))
               ;; Why “=”: if cell-width is 0 and the whole column is 0,
               ;; still record it.
               (if (>= cell-width (or oldmax 0))
@@ -565,7 +569,7 @@ If FORCE non-nil, force align."
             (let* ((col-width (nth column-idx column-width-list))
                    (alignment (nth column-idx column-alignment-list))
                    ;; Pixel width of the cell.
-                   (cell-width (valign--cell-width)))
+                   (cell-width (valign--cell-content-width)))
               ;; Align cell.
               (cl-labels ((valign--put-ov
                            (beg end xpos)
