@@ -113,6 +113,13 @@ right bar."
                 (1+ content-end-strict))
               cell-end)))))
 
+(defun valign--cell-empty-p ()
+  "Return non-nil if cell is empty.
+Assumes point is after the left bar (“|”)."
+  (save-excursion
+    (and (skip-chars-forward " ")
+         (looking-at "|"))))
+
 (defun valign--cell-width ()
   "Return the pixel width of the cell at point.
 Assumes point is after the left bar (“|”).
@@ -126,8 +133,18 @@ Return nil if not in a cell."
   ;;      EMPTY     := <SPACE>+
   ;;      NON-EMPTY := <SPACE>+<NON-SPACE>+<SPACE>+
   ;;      DELIM     := | or +
-  (pcase-let ((`(,_a ,beg ,end ,_b) (valign--cell-content-config)))
-    (valign--pixel-width-from-to beg end)))
+  ;;
+  ;; Sometimes, because of Org's table alignment, empty cell is longer
+  ;; than non-empty cell.  This usually happens with CJK text, because
+  ;; CJK characters are shorter than 2x ASCII character but Org treats
+  ;; CJK characters as 2 ASCII characters when aligning.  And if you
+  ;; have 16 CJK char in one cell, Org uses 32 ASCII spaces for the
+  ;; empty cell, which is longer than 16 CJK chars.  So better regard
+  ;; empty cell as 0-width rather than measuring it's white spaces.
+  (if (valign--cell-empty-p)
+      0
+    (pcase-let ((`(,_a ,beg ,end ,_b) (valign--cell-content-config)))
+      (valign--pixel-width-from-to beg end))))
 
 ;; We used to use a custom functions that calculates the pixel text
 ;; width that doesn’t require a live window.  However that function
@@ -175,7 +192,8 @@ cell.  We don’t distinguish between left and center aligned."
 At each row, stop at the beginning of the line.  Start from point
 and stop at LIMIT.  ROW-IDX-SYM is bound to each row’s
 index (0-based)."
-  (declare (indent 2))
+  (declare (debug (sexp form &rest form))
+           (indent 2))
   `(progn
      (setq ,row-idx-sym 0)
      (while (<= (point) ,limit)
@@ -189,7 +207,8 @@ index (0-based)."
 Start from point and stop at the end of the line.  Stop after the
 cell bar (“|”) in each iteration.
 COLUMN-IDX-SYM is bound to the index of the column (0-based)."
-  (declare (indent 1))
+  (declare (debug (sexp &rest form))
+           (indent 1))
   `(progn
      (setq ,column-idx-sym 0)
      (beginning-of-line)
@@ -474,13 +493,19 @@ You need to restart valign mode for this setting to take effect."
 (defun valign-table ()
   "Visually align the table at point."
   (interactive)
+  (valign-table-maybe t))
+
+(defun valign-table-maybe (&optional force)
+  "Visually align the table at point.
+If FORCE non-nil, force align."
   (condition-case err
       (save-excursion
-        (when (and (display-graphic-p)
-                   (valign--at-table-p)
-                   (progn (valign--beginning-of-table)
-                          (text-property-any
-                           (point) (1+ (point)) 'valign-init nil)))
+        (when (or force
+                  (and (display-graphic-p)
+                       (valign--at-table-p)
+                       (progn (valign--beginning-of-table)
+                              (text-property-any
+                               (point) (1+ (point)) 'valign-init nil))))
           (valign-table-1)))
     ((valign-bad-cell search-failed error)
      (valign--clean-text-property
@@ -580,7 +605,7 @@ Force align if FORCE non-nil."
         (while (and (search-forward "|" nil t)
                     (< (point) end))
           (condition-case err
-              (valign-table)
+              (valign-table-maybe)
             (error (message "Error when aligning table: %s"
                             (error-message-string err))))
           (valign--end-of-table)))))
@@ -613,17 +638,12 @@ FLAG is the same as in ‘org-flag-region’."
       (when-let ((on-table (valign--at-table-p))
                  (beg (progn (valign--beginning-of-table) (point)))
                  (end (progn (valign--end-of-table) (point))))
-        (with-silent-modifications
-          (put-text-property beg end 'valign-init nil)
-          (valign-table))))))
+        (valign-table)))))
 
 (defun valign-reset-buffer ()
   "Remove alignment in the buffer."
-  ;; TODO Use the new Emacs 27 function.
-  ;; Remove text properties
   (with-silent-modifications
     (valign--clean-text-property (point-min) (point-max))
-    (put-text-property (point-min) (point-max) 'font-lock-face nil)
     (jit-lock-refontify)))
 
 (defun valign-remove-advice ()
