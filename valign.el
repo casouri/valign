@@ -591,22 +591,31 @@ If FORCE non-nil, force align."
                                ,content-end
                                ,cell-end)
                              (valign--cell-content-config)))
-                  (if (= cell-beg content-beg)
-                      ;; This cell has only one space.
-                      (valign--put-ov
-                       cell-beg cell-end
-                       (+ column-start col-width space-width))
-                    ;; A normal cell.
-                    (pcase alignment
-                      ;; Align a left-aligned cell.
-                      ('left (valign--put-ov
-                              content-end cell-end
-                              (+ column-start col-width space-width)))
-                      ;; Align a right-aligned cell.
-                      ('right (valign--put-ov
-                               cell-beg content-beg
-                               (+ column-start
-                                  (- col-width cell-width))))))))
+                  (cond ((= cell-beg content-beg)
+                         ;; This cell has only one space.
+                         (valign--put-ov
+                          cell-beg cell-end
+                          (+ column-start col-width space-width)))
+                        ;; Empty cell.  Sometimes empty cells are
+                        ;; longer than other non-empty cells (see
+                        ;; `valign--cell-width'), so we put overlay on
+                        ;; all but the first white space.
+                        ((valign--cell-empty-p)
+                         (valign--put-ov
+                          content-beg cell-end
+                          (+ column-start col-width space-width)))
+                        ;; A normal cell.
+                        (t
+                         (pcase alignment
+                           ;; Align a left-aligned cell.
+                           ('left (valign--put-ov
+                                   content-end cell-end
+                                   (+ column-start col-width space-width)))
+                           ;; Align a right-aligned cell.
+                           ('right (valign--put-ov
+                                    cell-beg content-beg
+                                    (+ column-start
+                                       (- col-width cell-width)))))))))
               ;; Update ‘column-start’ for the next cell.
               (setq column-start (+ column-start
                                     col-width
