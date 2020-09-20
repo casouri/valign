@@ -1,0 +1,92 @@
+   | $A_4$ | $n_c$ | c        | $1$ | $1'$         | $1''$        |  3 |
+   |-------+-------+----------+-----+--------------+--------------+----|
+   | 1     |     1 | I        |   1 | 1            | 1            |  3 |
+   | $Z_2$ |     3 | (12)(34) |   1 | 1            | 1            | -1 |
+   | $Z_3$ |     4 | (123)    |   1 | $\omega$     | $\omega^{*}$ |  0 |
+   | $Z_3$ |     4 | (132)    |   1 | $\omega^{*}$ | $\omega$     |  0 |
+
+| 111111111111111111111111111111111111111111111111111111111111                                                     |
+| 我我我我我我我我我我我我我我我我我我我我我我我我我我我我                                                         |
+| 我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我我 |
+|                                                                                                                  |
+|                                                                                                                  |
+
+| header file                             | compile time (s) |
+|-----------------------------------------+------------------|
+| =ks/reco/leaf/common.h=                 |           35.487 |
+| =ks/reco/util/util_session_parameter.h= |            8.200 |
+| =ks/reco/util/config_key.h=             |            3.800 |
+| =serving_base/util/kconf_util.h=        |            3.526 |
+|                                         |                  |
+
+#+begin_example
+|---+------------------------------|               |---+--------|
+|   |                              |               |   | <6>    |
+| 1 | one                          |               | 1 | one    |
+| 2 | two                          |     ----\     | 2 | two    |
+| 3 | This is a long chunk of text |     ----/     | 3 | This=> |
+| 4 | four                         |               | 4 | four   |
+|---+------------------------------|               |---+--------|
+#+end_example
+
+|    Header |
+|-----------|
+|      Body |
+|      Text |
+|      Cell |
+|         3 |
+|         4 |
+|         5 |
+| 888888888 |
+|         4 |
+
+#+latex: : | Table      | Header         | Header |
+|------------+---------------------------------+----|
+| 汉字中文…… | ddddddddddddddddddddddddddddddd | CC |
+| Serif……    | Variable width                  |    |
+
+| Peace          | August       | Love |
+|----------------+--------------+------|
+| ssh tunnel     | woome        |   23 |
+| 对齐等宽       | 日本語もいい |   89 |
+| 中文汉字       | 感动         |  133 |
+| rgfe           | 图片         |   12 |
+| variable-pitch | x            |   13 |
+| thirteen       | Ω            |   88 |
+| great          | www          |   98 |
+
+**** header
+#+name: hey
+| a    | b            |    |
+|------+--------------+----|
+| 你好 | +我不好+     |    |
+| hi   | good morning |    |
+| ~hi~ | good         | hi |
+
+| header file                             | compile time (s) |
+|-----------------------------------------+------------------|
+| =ks/reco/leaf/common.h=                 |           35.487 |
+| =ks/reco/util/util_session_parameter.h= |            8.200 |
+| =ks/reco/util/config_key.h=             |            3.800 |
+| =serving_base/util/kconf_util.h=        |            3.526 |
+
+
+* header
+
+|          |   | hi |
+| 测试一下 |   |    |
+| [[www.veemo.com][link]]     |   |    |
+
+|----------------------------------+---+---|
+| Data Zone                        |   |   |
+|                                  |   |   |
+| [[/Users/yuan/t/20200616151642.png]] |   |   |
+|                                  |   |   |
+|                                  |   |   |
+|                                  |   |   |
+|----------------------------------+---+---|
+
+
+# Local Variables:
+# eval: (visual-line-mode -1)
+# End:
