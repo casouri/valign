@@ -436,6 +436,8 @@ STYLE is 'single-column.  COLUMN-WIDTH-LIST is returned from
          ;; Position of the right-most bar.
          (total-width (+ (apply #'+ column-width-list)
                          (* bar-width (1+ column-count)))))
+    ;; Render the left bar.
+    (valign--maybe-render-bar (1- (point)))
     (when (search-forward "|" nil t)
       (valign--put-overlay p (1- (point)) total-width
                            'face '(:strike-through t))
@@ -479,7 +481,11 @@ COLUMN-WIDTH-LIST is returned from `valign--calculate-cell-width'."
         (col-idx 0)
         (pos (valign--pixel-width-from-to
               (line-beginning-position) (point) t)))
+    ;; Render the first left bar.
+    (valign--maybe-render-bar (1- (point)))
     (while (re-search-forward "[+|]" (line-end-position) t)
+      ;; Render the right bar.
+      (valign--maybe-render-bar (1- (point)))
       (let ((column-width (nth col-idx column-width-list)))
         (valign--separator-row-add-overlay
          column-start (1- (point)) (+ pos column-width space-width))
@@ -571,13 +577,16 @@ If FORCE non-nil, force align."
         ;; bar.
         (setq column-start (valign--pixel-width-from-to
                             (line-beginning-position) (point) t))
-        (valign--maybe-render-bar (1- (point)))
+
         (valign--do-column column-idx
           (save-excursion
             ;; We are after the left bar (“|”).
+            ;; Render the left bar.
+            (valign--maybe-render-bar (1- (point)))
             ;; Start aligning this cell.
-            ;;      Pixel width of the column
+            ;;      Pixel width of the column.
             (let* ((col-width (nth column-idx column-width-list))
+                   ;; left or right aligned.
                    (alignment (nth column-idx column-alignment-list))
                    ;; Pixel width of the cell.
                    (cell-width (valign--cell-content-width)))
@@ -620,7 +629,9 @@ If FORCE non-nil, force align."
               (setq column-start (+ column-start
                                     col-width
                                     bar-width
-                                    space-width)))))))))
+                                    space-width)))))
+        ;; Now we are at the last right bar.
+        (valign--maybe-render-bar (1- (point)))))))
 
 ;;; Mode intergration
 
