@@ -618,7 +618,8 @@ If FORCE non-nil, force align."
                            ;; Align a left-aligned cell.
                            ('left (valign--put-ov
                                    content-end cell-end
-                                   (+ column-start col-width space-width)))
+                                   (+ column-start
+                                      col-width space-width)))
                            ;; Align a right-aligned cell.
                            ('right (valign--put-ov
                                     cell-beg content-beg
