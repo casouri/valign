@@ -417,10 +417,9 @@ before event, ACTION is either 'entered or 'left."
         (delete-overlay ov)))))
 
 (defun valign--glyph-width-of (string point)
-  "Return the pixel width of STRING with font at POINT."
-  (aref (aref (font-get-glyphs (font-at point) 0 (length string) string)
-              0)
-        4))
+  "Return the pixel width of STRING with font at POINT.
+STRING should have length 1."
+  (aref (aref (font-get-glyphs (font-at point) 0 1 string) 0) 4))
 
 (cl-defmethod valign--align-separator-row
   (type (style (eql single-column)) column-width-list)
