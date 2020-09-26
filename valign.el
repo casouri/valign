@@ -389,23 +389,27 @@ WINDOW is just window, PREV-POS is the previous point of cursor
 before event, ACTION is either 'entered or 'left."
   (ignore window)
   (with-silent-modifications
-    (pcase action
-      ('entered (put-text-property
-                 (point) (1+ (point))
-                 'display (if (eq cursor-type 'bar)
-                              '(space :width (3)) " ")))
-      ('left (put-text-property prev-pos (1+ prev-pos)
-                                'display '(space :width (1)))))))
+    (let ((ov-list (overlays-at (pcase action
+                                  ('entered (point))
+                                  ('left prev-pos)))))
+      (dolist (ov ov-list)
+        (when (overlay-get ov 'valign-bar)
+          (overlay-put
+           ov 'display (pcase action
+                         ('entered (if (eq cursor-type 'bar)
+                                       '(space :width (3)) " "))
+                         ('left '(space :width (1))))))))))
 
 (defun valign--render-bar (point)
   "Make the character at POINT a full-height bar."
   (with-silent-modifications
     (put-text-property point (1+ point)
-                       'display '(space :width (1)))
-    (put-text-property point (1+ point)
                        'cursor-sensor-functions
                        '(valign--fancy-bar-cursor-fn))
-    (valign--put-overlay point (1+ point) 'face '(:inverse-video t))))
+    (valign--put-overlay point (1+ point)
+                         'face '(:inverse-video t)
+                         'display '(space :width (1))
+                         'valign-bar t)))
 
 (defun valign--clean-text-property (beg end)
   "Clean up the display text property between BEG and END."
