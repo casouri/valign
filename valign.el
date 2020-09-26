@@ -531,6 +531,15 @@ You need to restart valign mode for this setting to take effect."
   (interactive)
   (valign-table-maybe t))
 
+(defvar valign-not-align-after-list '(self-insert-command
+                                      org-self-insert-command
+                                      markdown-outdent-or-delete
+                                      org-delete-backward-char
+                                      backward-kill-word
+                                      delete-char
+                                      kill-word)
+  "Valign doesn’t align table after these commands.")
+
 (defun valign-table-maybe (&optional force)
   "Visually align the table at point.
 If FORCE non-nil, force align."
@@ -539,9 +548,8 @@ If FORCE non-nil, force align."
         (when (and (display-graphic-p)
                    (valign--at-table-p)
                    (or force
-                       (not (memq this-command
-                                  '(self-insert-command
-                                    org-self-insert-command)))))
+                       (not (memq (or this-command last-command)
+                                  valign-not-align-after-list))))
           (valign-table-1)))
     ((valign-bad-cell search-failed error)
      (valign--clean-text-property
