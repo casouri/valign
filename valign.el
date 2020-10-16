@@ -676,6 +676,13 @@ Force align if FORCE non-nil."
   (when valign-mode
     (valign-region)))
 
+(defvar org-indent-agentized-buffers)
+(defun valign--org-indent-advice (&rest _)
+  "Re-align after org-indent is done."
+  ;; See ‘org-indent-initialize-agent’.
+  (when (not org-indent-agentized-buffers)
+    (valign--buffer-advice)))
+
 ;; When an org link is in an outline fold, it’s full length
 ;; is used, when the subtree is unveiled, org link only shows
 ;; part of it’s text, so we need to re-align.  This function
@@ -746,10 +753,15 @@ FLAG is the same as in ‘org-flag-region’."
             (advice-add fn :after #'valign--buffer-advice))
           (dolist (fn '(org-flag-region outline-flag-region))
             (advice-add fn :after #'valign--flag-region-advice))
+          (with-eval-after-load 'org-indent
+            (advice-add 'org-indent-initialize-agent
+                        :after #'valign--org-indent-advice))
           (add-hook 'org-indent-mode-hook #'valign--buffer-advice 0 t)
           (if valign-fancy-bar (cursor-sensor-mode))
           (jit-lock-refontify))
-      (remove-hook 'org-indent-mode-hook #'valign--buffer-advice t)
+      (with-eval-after-load 'org-indent
+        (advice-remove 'org-indent-initialize-agent
+                       #'valign--org-indent-advice))
       (remove-hook 'jit-lock-functions #'valign-region t)
       (valign-reset-buffer)
       (cursor-sensor-mode -1))))
