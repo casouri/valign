@@ -654,9 +654,9 @@ Force align if FORCE non-nil."
   ;; Text sized can differ between frames, only use current frame.
   ;; We only align when this buffer is in a live window, because we
   ;; need ‘window-text-pixel-size’ to calculate text size.
-  (let ((beg (or beg (point-min)))
-        (end (or end (point-max)))
-        (fontified-end end))
+  (let* ((beg (or beg (point-min)))
+         (end (or end (point-max)))
+         (fontified-end end))
     (when (window-live-p (get-buffer-window nil (selected-frame)))
       (save-excursion
         (goto-char beg)
