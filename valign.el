@@ -331,7 +331,7 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
     (beginning-of-line)
     (let ((face (plist-get (text-properties-at (point)) 'face)))
       ;; Don’t align tables in org blocks.
-      (and (looking-at "[ \t]*|")
+      (and (looking-at "[ \t]*[|\\+]")
            (not (and (consp face)
                      (or (equal face '(org-block))
                          (equal (plist-get face :inherit)
@@ -343,7 +343,7 @@ Assumes point is on a table."
   (beginning-of-line)
   (let ((p (point)))
     (catch 'abort
-      (while (looking-at "[ \t]*|")
+      (while (looking-at "[ \t]*[|\\+]")
         (setq p (point))
         (if (eq (point) (point-min))
             (throw 'abort nil))
@@ -355,7 +355,7 @@ Assumes point is on a table."
   "Go forward to the end of the table at point.
 Assumes point is on a table."
   (end-of-line)
-  (while (looking-at "\n[ \t]*|")
+  (while (looking-at "\n[ \t]*[|\\+]")
     (forward-line)
     (end-of-line)))
 
@@ -429,8 +429,8 @@ STRING should have length 1."
   (type (style (eql single-column)) column-width-list)
   "Align the separator row (|---+---|) as “|---------|”.
 Assumes the point is after the left bar (“|”).  TYPE can be
-either 'org-mode or 'markdown, it doesn’t make any difference.
-STYLE is 'single-column.  COLUMN-WIDTH-LIST is returned from
+either 'org-mode or 'markdown.  STYLE is 'single-column.
+COLUMN-WIDTH-LIST is returned from
 `valign--calculate-cell-width'."
   (ignore type style)
   (let* ((p (point))
@@ -441,7 +441,7 @@ STYLE is 'single-column.  COLUMN-WIDTH-LIST is returned from
                          (* bar-width (1+ column-count)))))
     ;; Render the left bar.
     (valign--maybe-render-bar (1- (point)))
-    (when (search-forward "|" nil t)
+    (when (re-search-forward "[|\\+]" nil t)
       (valign--put-overlay p (1- (point)) total-width
                            'face '(:strike-through t))
       ;; Render the right bar.
@@ -476,7 +476,8 @@ Assumes point is on the right bar or plus sign."
   (type (style (eql multi-column)) column-width-list)
   "Align the separator row in multi column style.
 TYPE can be 'org-mode or 'markdown-mode, STYLE is 'multi-column.
-COLUMN-WIDTH-LIST is returned from `valign--calculate-cell-width'."
+COLUMN-WIDTH-LIST is returned from
+`valign--calculate-cell-width'."
   (ignore type style)
   (let ((bar-width (valign--glyph-width-of "|" (point)))
         (space-width (valign--glyph-width-of " " (point)))
@@ -486,6 +487,12 @@ COLUMN-WIDTH-LIST is returned from `valign--calculate-cell-width'."
               (line-beginning-position) (point) t)))
     ;; Render the first left bar.
     (valign--maybe-render-bar (1- (point)))
+    ;; Specially handle separator lines like “+--+--+”.
+    (when (looking-back "\\+" 1)
+      (valign--put-overlay (1- (point)) (point) 'display "|")
+      (setq pos (valign--pixel-width-from-to
+                 (line-beginning-position) (point) t)))
+    ;; Add overlay in each column.
     (while (re-search-forward "[+|]" (line-end-position) t)
       ;; Render the right bar.
       (valign--maybe-render-bar (1- (point)))
@@ -575,7 +582,7 @@ If FORCE non-nil, force align."
 
     ;; Align each row.
     (valign--do-row row-idx table-end
-      (search-forward "|" (line-end-position))
+      (re-search-forward "[|\\+]" (line-end-position))
       (if (valign--separator-p)
           ;; Separator row.
           (valign--align-separator-row
