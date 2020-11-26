@@ -511,28 +511,6 @@ before event, ACTION is either 'entered or 'left."
 STRING should have length 1."
   (aref (aref (font-get-glyphs (font-at point) 0 1 string) 0) 4))
 
-(cl-defmethod valign--align-separator-row
-  (type (style (eql single-column)) column-width-list)
-  "Align the separator row (|---+---|) as “|---------|”.
-Assumes the point is after the left bar (“|”).  TYPE can be
-either 'org-mode or 'markdown.  STYLE is 'single-column.
-COLUMN-WIDTH-LIST is returned from
-`valign--calculate-cell-width'."
-  (ignore type style)
-  (let* ((p (point))
-         (column-count (length column-width-list))
-         (bar-width (valign--glyph-width-of "|" p))
-         ;; Position of the right-most bar.
-         (total-width (+ (apply #'+ column-width-list)
-                         (* bar-width (1+ column-count)))))
-    ;; Render the left bar.
-    (valign--maybe-render-bar (1- (point)))
-    (when (re-search-forward "|" nil t)
-      (valign--put-overlay p (1- (point)) total-width
-                           'face '(:strike-through t))
-      ;; Render the right bar.
-      (valign--maybe-render-bar (1- (point))))))
-
 (defun valign--separator-row-add-overlay (beg end right-pos)
   "Add overlay to a separator row’s “cell”.
 Cell ranges from BEG to END, the pixel position RIGHT-POS marks
@@ -558,13 +536,9 @@ Assumes point is on the right bar or plus sign."
                        'display (valign--space right-pos)
                        'face '(:strike-through t)))
 
-(cl-defmethod valign--align-separator-row
-  (type (style (eql multi-column)) column-width-list)
+(defun valign--align-separator-row (column-width-list)
   "Align the separator row in multi column style.
-TYPE can be 'org-mode or 'markdown-mode, STYLE is 'multi-column.
-COLUMN-WIDTH-LIST is returned from
-`valign--calculate-cell-width'."
-  (ignore type style)
+COLUMN-WIDTH-LIST is returned by `valign--calculate-cell-width'."
   (let ((bar-width (valign--glyph-width-of "|" (point)))
         (space-width (valign--glyph-width-of " " (point)))
         (column-start (point))
@@ -594,18 +568,6 @@ COLUMN-WIDTH-LIST is returned from
 
 
 ;;; Userland
-
-(defcustom valign-separator-row-style 'multi-column
-  "The style of the separator row of a table.
-Valign can render it as “|-----------|”
-or as “|-----|-----|”.  Set this option to 'single-column
-for the former, and 'multi-column for the latter.
-You need to restart valign mode or realign tables for this
-setting to take effect."
-  :type '(choice
-          (const :tag "Multiple columns" multi-column)
-          (const :tag "A single column" single-column))
-  :group 'valign)
 
 (defcustom valign-fancy-bar nil
   "Non-nil means to render bar as a full-height line.
@@ -670,10 +632,7 @@ If FORCE non-nil, force align."
       (re-search-forward "|" (line-end-position))
       (if (valign--separator-p)
           ;; Separator row.
-          (valign--align-separator-row
-           (valign--guess-table-type)
-           valign-separator-row-style
-           column-width-list)
+          (valign--align-separator-row column-width-list)
 
         ;; Not separator row, align each cell. ‘column-start’ is the
         ;; pixel position of the current point, i.e., after the left
