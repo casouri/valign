@@ -902,8 +902,7 @@ FLAG is the same as in ‘org-flag-region’."
                 markdown-cycle))
     (advice-remove fn #'valign--tab-advice))
   (dolist (fn '(text-scale-increase
-                text-scale-decrease
-                org-agenda-finalize-hook))
+                text-scale-decrease))
     (advice-remove fn #'valign--buffer-advice))
   (dolist (fn '(org-flag-region outline-flag-region))
     (advice-remove fn #'valign--flag-region-advice)))
@@ -949,7 +948,6 @@ You need to restart valign mode for this setting to take effect."
             (advice-add fn :after #'valign--tab-advice))
           (dolist (fn '(text-scale-increase
                         text-scale-decrease
-                        org-agenda-finalize-hook
                         org-toggle-inline-images))
             (advice-add fn :after #'valign--buffer-advice))
           (dolist (fn '(org-flag-region outline-flag-region))
