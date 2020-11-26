@@ -650,48 +650,73 @@ If FORCE non-nil, force align."
                    ;; Pixel width of the cell.
                    (cell-width (valign--cell-content-width)))
               ;; Align cell.
-              (cl-labels ((valign--put-ov
-                           (beg end xpos)
-                           (valign--put-overlay beg end 'display
-                                                (valign--space xpos))))
-                (pcase-let ((`(,cell-beg
-                               ,content-beg
-                               ,content-end
-                               ,cell-end)
-                             (valign--cell-content-config)))
-                  (cond ((= cell-beg content-beg)
-                         ;; This cell has only one space.
-                         (valign--put-ov
-                          cell-beg cell-end
-                          (+ column-start col-width space-width)))
-                        ;; Empty cell.  Sometimes empty cells are
-                        ;; longer than other non-empty cells (see
-                        ;; `valign--cell-width'), so we put overlay on
-                        ;; all but the first white space.
-                        ((valign--cell-empty-p)
-                         (valign--put-ov
-                          content-beg cell-end
-                          (+ column-start col-width space-width)))
-                        ;; A normal cell.
-                        (t
-                         (pcase alignment
-                           ;; Align a left-aligned cell.
-                           ('left (valign--put-ov
-                                   content-end cell-end
-                                   (+ column-start
-                                      col-width space-width)))
-                           ;; Align a right-aligned cell.
-                           ('right (valign--put-ov
-                                    cell-beg content-beg
-                                    (+ column-start
-                                       (- col-width cell-width)))))))))
+              (pcase-let ((`(,cell-beg ,content-beg
+                                       ,content-end ,cell-end)
+                           (valign--cell-content-config)))
+                (valign--cell col-width alignment cell-width
+                              cell-beg content-beg
+                              content-end cell-end
+                              column-start space-width))
               ;; Update ‘column-start’ for the next cell.
-              (setq column-start (+ column-start
-                                    col-width
-                                    bar-width
-                                    space-width)))))
+              (setq column-start (+ column-start col-width
+                                    bar-width space-width)))))
         ;; Now we are at the last right bar.
         (valign--maybe-render-bar (1- (point)))))))
+
+(defun valign--cell (col-width alignment cell-width
+                               cell-beg content-beg
+                               content-end cell-end
+                               column-start space-width)
+  "Align the cell at point.
+
+For an example cell:
+
+|   content content   |
+ ↑  ↑              ↑  ↑
+ 1  2              3  4
+    <------5------>
+ <--------6---------->
+
+COL-WIDTH     (6) Pixel width of the column
+ALIGNMENT         'left or 'right
+CELL-WIDTH    (5) Pixel width of the cell content
+CELL-BEG      (1) Beginning of the cell
+CONTENT-BEG   (2) Beginning of the cell content
+CONTENT-END   (3) End of the cell content
+CELL-END      (4) End of the cell
+COLUMN-START  (1) Pixel x-position of the beginning of the cell
+SPACE-WIDTH       Pixel width of a space character
+
+Assumes point is at (2)."
+  (cl-labels ((valign--put-ov
+               (beg end xpos)
+               (valign--put-overlay beg end 'display
+                                    (valign--space xpos))))
+    (cond ((= cell-beg content-beg)
+           ;; This cell has only one space.
+           (valign--put-ov
+            cell-beg cell-end
+            (+ column-start col-width space-width)))
+          ;; Empty cell.  Sometimes empty cells are
+          ;; longer than other non-empty cells (see
+          ;; `valign--cell-width'), so we put overlay on
+          ;; all but the first white space.
+          ((valign--cell-empty-p)
+           (valign--put-ov
+            content-beg cell-end
+            (+ column-start col-width space-width)))
+          ;; A normal cell.
+          (t
+           (pcase alignment
+             ;; Align a left-aligned cell.
+             ('left (valign--put-ov content-end cell-end
+                                    (+ column-start
+                                       col-width space-width)))
+             ;; Align a right-aligned cell.
+             ('right (valign--put-ov
+                      cell-beg content-beg
+                      (+ column-start
+                         (- col-width cell-width)))))))))
 
 (defun valign--table-2 ()
   "Visually align the table.el table at point."
