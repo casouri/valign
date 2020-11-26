@@ -299,60 +299,62 @@ column (0-based)."
          ,@body)
        (cl-incf ,column-idx-sym))))
 
-(defun valign--alist-to-list (alist)
-  "Convert an ALIST ((0 . a) (1 . b) (2 . c)) to (a b c)."
-  (let ((inc 0) return-list)
-    (while (alist-get inc alist)
-      (push (alist-get inc alist)
-            return-list)
-      (cl-incf inc))
-    (reverse return-list)))
+(defun valign--transpose (matrix)
+  "Transpose MATRIX."
+  (cl-loop for col-idx from 0 to (1- (length (car matrix)))
+           collect
+           (cl-loop for row in matrix
+                    collect (nth col-idx row))))
 
-(defun valign--calculate-cell-width (limit &optional bar-char)
+(defun valign--separator-line-p (&optional charset)
+  "Return t if this line is a separator line.
+If the table is a table.el table, you need to specify CHARSET.
+Assumes the point is at the beginning of the line."
+  (let ((charset (or charset (cdar valign-box-charset-alist))))
+    (and (re-search-forward
+          (rx-to-string `(or ,(valign-box-char 1 charset)
+                             ,(valign-box-char 4 charset)
+                             ,(valign-box-char 7 charset)
+                             ,(valign-box-char 'v charset))))
+         (valign--separator-p))))
+
+(defun valign--calculate-cell-width (limit &optional charset)
   "Return a list of column widths.
 Each column width is the largest cell width of the column.  Start
-from point, stop at LIMIT.  BAR-CHAR is the bar character (“|”),
-defaults to \"|\"."
-  (let ((bar-char (or bar-char "|"))
-        row-idx column-idx column-width-alist)
+from point, stop at LIMIT.  If the table is a table.el table, you
+need to specify CHARSET."
+  (let* ((charset (or charset (cdar valign-box-charset-alist)))
+         (bar-char (valign-box-char 'v charset))
+         row-idx column-idx matrix row)
     (ignore row-idx)
     (save-excursion
       (valign--do-row row-idx limit
-        (valign--do-column column-idx bar-char
-          ;; Point is after the left “|”.
-          ;;
-          ;; Calculate this column’s pixel width, record it if it
-          ;; is the largest one for this column.
-          (unless (valign--separator-p)
-            (let ((oldmax (alist-get column-idx column-width-alist))
-                  (cell-width (valign--cell-nonempty-width bar-char)))
-              ;; Why “=”: if cell-width is 0 and the whole column is 0,
-              ;; still record it.
-              (if (>= cell-width (or oldmax 0))
-                  (setf (alist-get column-idx column-width-alist)
-                        cell-width)))))))
-    ;; Turn alist into a list.
-    (mapcar (lambda (width) (+ width 16))
-            (valign--alist-to-list column-width-alist))))
+        (unless (valign--separator-line-p charset)
+          (setq row nil)
+          (valign--do-column column-idx bar-char
+            ;; Point is after the left “|”.
+            (push (valign--cell-nonempty-width bar-char) row))
+          (push (reverse row) matrix))))
+    (setq matrix (valign--transpose (reverse matrix)))
+    (mapcar (lambda (col) (apply #'max col)) matrix)))
 
 (cl-defmethod valign--calculate-alignment ((type (eql markdown)) limit)
   "Return a list of alignments ('left or 'right) for each column.
 TYPE must be 'markdown.  Start at point, stop at LIMIT."
   (ignore type)
-  (let (row-idx column-idx column-alignment-alist)
+  (let (row-idx column-idx matrix row)
     (ignore row-idx)
     (save-excursion
       (valign--do-row row-idx limit
-        (when (valign--separator-p)
+        (when (valign--separator-line-p)
+          (setq row nil)
           (valign--do-column column-idx "|"
-            (setf (alist-get column-idx column-alignment-alist)
-                  (valign--alignment-from-seperator))))))
-    (if (not column-alignment-alist)
-        (save-excursion
-          (valign--do-column column-idx "|"
-            (push 'left column-alignment-alist))
-          column-alignment-alist)
-      (valign--alist-to-list column-alignment-alist))))
+            (push (valign--alignment-from-seperator) row))
+          (push (reverse row) matrix))))
+    (setq matrix (valign--transpose (reverse matrix)))
+    (or matrix
+        (dotimes (_ column-idx matrix)
+          (push 'left matrix)))))
 
 (cl-defmethod valign--calculate-alignment ((type (eql org)) limit)
   "Return a list of alignments ('left or 'right) for each column.
@@ -361,25 +363,23 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
   ;; Because the widest cell of a column has one space on both side,
   ;; making it impossible to infer the alignment.
   (ignore type)
-  (let (column-idx column-alignment-alist row-idx)
+  (let (column-idx row-idx row matrix)
     (ignore row-idx)
     (save-excursion
       (valign--do-row row-idx limit
-        (valign--do-column column-idx "|"
-          (when (not (valign--separator-p))
-            (setf (alist-get column-idx column-alignment-alist)
-                  (cons (valign--cell-alignment)
-                        (alist-get column-idx column-alignment-alist))))))
-      ;; Now we have an alist
-      ;; ((0 . (left left right left ...) (1 . (...))))
+        (unless (valign--separator-line-p)
+          (setq row nil)
+          (valign--do-column column-idx "|"
+            (push (valign--cell-alignment) row))
+          (push (reverse row) matrix)))
+      (setq matrix (valign--transpose (reverse matrix)))
       ;; For each column, we take the majority.
-      (cl-labels ((majority (list)
-                            (let ((left-count (cl-count 'left list))
-                                  (right-count (cl-count 'right list)))
-                              (if (> left-count right-count)
-                                  'left 'right))))
-        (mapcar #'majority
-                (valign--alist-to-list column-alignment-alist))))))
+      (mapcar (lambda (col)
+                (let ((left-count (cl-count 'left col))
+                      (right-count (cl-count 'right col)))
+                  (if (> left-count right-count)
+                      'left 'right)))
+              matrix))))
 
 (defun valign--at-table-p ()
   "Return non-nil if point is in a table."
@@ -726,8 +726,7 @@ Assumes point is at (2)."
           ;; Make every width multiples of CHAR-WIDTH.
           (mapcar (lambda (x)
                     (* char-width (1+ (/ (- x 16) char-width))))
-                  (valign--calculate-cell-width
-                   table-end (valign-box-char 'v charset))))
+                  (valign--calculate-cell-width table-end charset)))
          (row-idx 0)
          (column-idx 0)
          (column-start 0))
