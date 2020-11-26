@@ -419,8 +419,8 @@ Assumes point is on a table."
 Assumes point is on a table."
   (end-of-line)
   (if (not (search-forward "\n\n" nil t))
-      (goto-char (point-max))
-    (skip-chars-backward "\n")))
+      (goto-char (point-max)))
+  (skip-chars-backward "\n"))
 
 (defun valign--put-overlay (beg end &rest props)
   "Put overlay between BEG and END.
