@@ -564,20 +564,7 @@ COLUMN-WIDTH-LIST is returned by `valign--calculate-cell-width'."
         (t 'org)))
 
 
-;;; Userland
-
-(defcustom valign-fancy-bar nil
-  "Non-nil means to render bar as a full-height line.
-You need to restart valign mode for this setting to take effect."
-  :type '(choice
-          (const :tag "Enable fancy bar" t)
-          (const :tag "Disable fancy bar" nil))
-  :group 'valign)
-
-(defun valign-table ()
-  "Visually align the table at point."
-  (interactive)
-  (valign-table-maybe t))
+;;; Align
 
 (defvar valign-not-align-after-list '(self-insert-command
                                       org-self-insert-command
@@ -923,6 +910,20 @@ FLAG is the same as in ‘org-flag-region’."
     (advice-remove fn #'valign--flag-region-advice)))
 
 ;;; Userland
+
+(defcustom valign-fancy-bar nil
+  "Non-nil means to render bar as a full-height line.
+You need to restart valign mode for this setting to take effect."
+  :type '(choice
+          (const :tag "Enable fancy bar" t)
+          (const :tag "Disable fancy bar" nil))
+  :group 'valign)
+
+;;;###autoload
+(defun valign-table ()
+  "Visually align the table at point."
+  (interactive)
+  (valign-table-maybe t))
 
 ;;;###autoload
 (define-minor-mode valign-mode
