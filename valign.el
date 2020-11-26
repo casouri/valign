@@ -57,6 +57,55 @@
 (define-error 'valign-not-gui "Valign only works in GUI environment")
 (define-error 'valign-not-on-table "Valign is asked to align a table, but the point is not on one")
 
+;;;; Table.el tables
+
+(defvar valign-box-charset-alist
+  '((ascii . "
++-++
+| ||
++-++
++-++")
+    (unicode . "
+┌─┬┐
+│ ││
+├─┼┤
+└─┴┘"))
+  "An alist of (NAME . CHARSET).
+A charset tells ftable how to parse the table.  I.e., what are the
+box drawing characters to use.  Don’t forget the first newline.
+NAME is the mnemonic for that charset.")
+
+(defun valign-box-char (code charset)
+  "Return a specific box drawing character in CHARSET.
+
+Return a string.  CHARSET should be like `ftable-box-char-set'.
+Mapping between CODE and position:
+
+    ┌┬┐     123
+    ├┼┤ <-> 456
+    └┴┘     789
+
+    ┌─┐     1 H 3    H: horizontal
+    │ │ <-> V   V    V: vertical
+    └─┘     7 H 9
+
+Examples:
+
+    (ftable-box-char 'h charset) => \"─\"
+    (ftable-box-char 2 charset)  => \"┬\""
+  (let ((index (pcase code
+                 ('h 10)
+                 ('v 11)
+                 ('n 12)
+                 ('s 13)
+                 (_ code))))
+
+    (char-to-string
+     (aref charset ;        1 2 3 4  5  6  7  8  9  H V N S
+           (nth index '(nil 1 3 4 11 13 14 16 18 19 2 6 0 7))))))
+
+;;;; Auxilary
+
 (defun valign--cell-alignment ()
   "Return how is current cell aligned.
 Return 'left if aligned left, 'right if aligned right.
@@ -72,7 +121,7 @@ Doesn’t check if we are in a cell."
             'right
           'left)))))
 
-(defun valign--cell-content-config ()
+(defun valign--cell-content-config (&optional bar-char)
   "Return (CELL-BEG CONTENT-BEG CONTENT-END CELL-END).
 CELL-BEG is after the left bar, CELL-END is before the right bar.
 CELL-CONTENT contains the actual non-white-space content,
@@ -87,17 +136,23 @@ CONTENT-END is
 
     (max (CELL-END - 1) CELL-BEG)
 
+BAR-CHAR is the separator character (“|”).  It is actually a
+string. Defaults to the normal bar: “|”, but you can provide a
+unicode one for unicode tables.
+
 Assumes point is after the left bar (“|”).  Assumes there is a
 right bar."
   (save-excursion
-    (let ((cell-beg (point))
-          (cell-end (save-excursion
-                      (search-forward "|" (line-end-position))
-                      (match-beginning 0)))
-          ;; `content-beg-strict' is the beginning of the content
-          ;; excluding any white space. Same for `content-end-strict'.
-          content-beg-strict content-end-strict)
-      (if (save-excursion (skip-chars-forward " ") (looking-at-p "|"))
+    (let* ((bar-char (or bar-char "|"))
+           (cell-beg (point))
+           (cell-end (save-excursion
+                       (search-forward bar-char (line-end-position))
+                       (match-beginning 0)))
+           ;; `content-beg-strict' is the beginning of the content
+           ;; excluding any white space. Same for `content-end-strict'.
+           content-beg-strict content-end-strict)
+      (if (save-excursion (skip-chars-forward " ")
+                          (looking-at-p bar-char))
           ;; Empty cell.
           (list cell-beg
                 (min (1+ cell-beg) cell-end)
@@ -131,10 +186,10 @@ Assumes point is after the left bar (“|”)."
     (and (skip-chars-forward " ")
          (looking-at "|"))))
 
-(defun valign--cell-content-width ()
+(defun valign--cell-content-width (&optional bar-char)
   "Return the pixel width of the cell at point.
-Assumes point is after the left bar (“|”).
-Return nil if not in a cell."
+Assumes point is after the left bar (“|”).  Return nil if not in
+a cell.  BAR-CHAR is the bar character (“|”)."
   ;; We assumes:
   ;; 1. Point is after the left bar (“|”).
   ;; 2. Cell is delimited by either “|” or “+”.
@@ -144,7 +199,8 @@ Return nil if not in a cell."
   ;;      EMPTY     := <SPACE>+
   ;;      NON-EMPTY := <SPACE>+<NON-SPACE>+<SPACE>+
   ;;      DELIM     := | or +
-  (pcase-let ((`(,_a ,beg ,end ,_b) (valign--cell-content-config)))
+  (pcase-let* ((`(,_a ,beg ,end ,_b)
+                (valign--cell-content-config bar-char)))
     (valign--pixel-width-from-to beg end)))
 
 ;; Sometimes, because of Org's table alignment, empty cell is longer
@@ -154,12 +210,12 @@ Return nil if not in a cell."
 ;; have 16 CJK char in one cell, Org uses 32 ASCII spaces for the
 ;; empty cell, which is longer than 16 CJK chars.  So better regard
 ;; empty cell as 0-width rather than measuring it's white spaces.
-(defun valign--cell-nonempty-width ()
+(defun valign--cell-nonempty-width (&optional bar-char)
   "Return the pixel width of the cell at point.
 If the cell is empty, return 0.  Otherwise return cell content’s
-width."
+width.  BAR-CHAR is the bar character (“|”)."
   (if (valign--cell-empty-p) 0
-    (valign--cell-content-width)))
+    (valign--cell-content-width bar-char)))
 
 ;; We used to use a custom functions that calculates the pixel text
 ;; width that doesn’t require a live window.  However that function
@@ -229,19 +285,20 @@ index (0-based)."
        (forward-line)
        (cl-incf ,row-idx-sym))))
 
-(defmacro valign--do-column (column-idx-sym &rest body)
+(defmacro valign--do-column (column-idx-sym bar-char &rest body)
   "Go to each column in the row and evaluate BODY.
 Start from point and stop at the end of the line.  Stop after the
-cell bar (“|”) in each iteration.
-COLUMN-IDX-SYM is bound to the index of the column (0-based)."
+cell bar (“|”) in each iteration.  BAR-CHAR is \"|\" for the most
+case.  COLUMN-IDX-SYM is bound to the index of the
+column (0-based)."
   (declare (debug (sexp &rest form))
-           (indent 1))
+           (indent 2))
   `(progn
      (setq ,column-idx-sym 0)
      (beginning-of-line)
-     (while (search-forward "|" (line-end-position) t)
+     (while (search-forward ,bar-char (line-end-position) t)
        ;; Unless we are after the last bar.
-       (unless (looking-at "[^|]*\n")
+       (unless (looking-at (format "[^%s]*\n" (regexp-quote ,bar-char)))
          ,@body)
        (cl-incf ,column-idx-sym))))
 
@@ -254,22 +311,24 @@ COLUMN-IDX-SYM is bound to the index of the column (0-based)."
       (cl-incf inc))
     (reverse return-list)))
 
-(defun valign--calculate-cell-width (limit)
+(defun valign--calculate-cell-width (limit &optional bar-char)
   "Return a list of column widths.
-Each column width is the largest cell width of the column.
-Start from point, stop at LIMIT."
-  (let (row-idx column-idx column-width-alist)
+Each column width is the largest cell width of the column.  Start
+from point, stop at LIMIT.  BAR-CHAR is the bar character (“|”),
+defaults to \"|\"."
+  (let ((bar-char (or bar-char "|"))
+        row-idx column-idx column-width-alist)
     (ignore row-idx)
     (save-excursion
       (valign--do-row row-idx limit
-        (valign--do-column column-idx
+        (valign--do-column column-idx bar-char
           ;; Point is after the left “|”.
           ;;
           ;; Calculate this column’s pixel width, record it if it
           ;; is the largest one for this column.
           (unless (valign--separator-p)
             (let ((oldmax (alist-get column-idx column-width-alist))
-                  (cell-width (valign--cell-nonempty-width)))
+                  (cell-width (valign--cell-nonempty-width bar-char)))
               ;; Why “=”: if cell-width is 0 and the whole column is 0,
               ;; still record it.
               (if (>= cell-width (or oldmax 0))
@@ -288,12 +347,12 @@ TYPE must be 'markdown.  Start at point, stop at LIMIT."
     (save-excursion
       (valign--do-row row-idx limit
         (when (valign--separator-p)
-          (valign--do-column column-idx
+          (valign--do-column column-idx "|"
             (setf (alist-get column-idx column-alignment-alist)
                   (valign--alignment-from-seperator))))))
     (if (not column-alignment-alist)
         (save-excursion
-          (valign--do-column column-idx
+          (valign--do-column column-idx "|"
             (push 'left column-alignment-alist))
           column-alignment-alist)
       (valign--alist-to-list column-alignment-alist))))
@@ -309,7 +368,7 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
     (ignore row-idx)
     (save-excursion
       (valign--do-row row-idx limit
-        (valign--do-column column-idx
+        (valign--do-column column-idx "|"
           (when (not (valign--separator-p))
             (setf (alist-get column-idx column-alignment-alist)
                   (cons (valign--cell-alignment)
@@ -330,8 +389,16 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
   (save-excursion
     (beginning-of-line)
     (let ((face (plist-get (text-properties-at (point)) 'face)))
-      ;; Don’t align tables in org blocks.
-      (and (looking-at "[ \t]*[|\\+]")
+      (and (progn (skip-chars-forward " \t")
+                  (member (char-to-string (char-after))
+                          (append
+                           (cl-loop for elt in valign-box-charset-alist
+                                    for charset = (cdr elt)
+                                    collect (valign-box-char 1 charset)
+                                    collect (valign-box-char 4 charset)
+                                    collect (valign-box-char 7 charset))
+                           '("|"))))
+           ;; Don’t align tables in org blocks.
            (not (and (consp face)
                      (or (equal face '(org-block))
                          (equal (plist-get face :inherit)
@@ -340,24 +407,23 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
 (defun valign--beginning-of-table ()
   "Go backward to the beginning of the table at point.
 Assumes point is on a table."
+  ;; This implementation allows non-table lines before a table, e.g.,
+  ;; #+latex: xxx
+  ;; |------+----|
   (beginning-of-line)
-  (let ((p (point)))
-    (catch 'abort
-      (while (looking-at "[ \t]*[|\\+]")
-        (setq p (point))
-        (if (eq (point) (point-min))
-            (throw 'abort nil))
-        (forward-line -1)
-        (beginning-of-line)))
-    (goto-char p)))
+  (while (and (< (point-min) (point))
+              (valign--at-table-p))
+    (forward-line -1))
+  (unless (valign--at-table-p)
+    (forward-line 1)))
 
 (defun valign--end-of-table ()
   "Go forward to the end of the table at point.
 Assumes point is on a table."
   (end-of-line)
-  (while (looking-at "\n[ \t]*[|\\+]")
-    (forward-line)
-    (end-of-line)))
+  (if (not (search-forward "\n\n" nil t))
+      (goto-char (point-max))
+    (skip-chars-backward "\n")))
 
 (defun valign--put-overlay (beg end &rest props)
   "Put overlay between BEG and END.
@@ -441,7 +507,7 @@ COLUMN-WIDTH-LIST is returned from
                          (* bar-width (1+ column-count)))))
     ;; Render the left bar.
     (valign--maybe-render-bar (1- (point)))
-    (when (re-search-forward "[|\\+]" nil t)
+    (when (re-search-forward "|" nil t)
       (valign--put-overlay p (1- (point)) total-width
                            'face '(:strike-through t))
       ;; Render the right bar.
@@ -487,13 +553,8 @@ COLUMN-WIDTH-LIST is returned from
               (line-beginning-position) (point) t)))
     ;; Render the first left bar.
     (valign--maybe-render-bar (1- (point)))
-    ;; Specially handle separator lines like “+--+--+”.
-    (when (looking-back "\\+" 1)
-      (valign--put-overlay (1- (point)) (point) 'display "|")
-      (setq pos (valign--pixel-width-from-to
-                 (line-beginning-position) (point) t)))
     ;; Add overlay in each column.
-    (while (re-search-forward "[+|]" (line-end-position) t)
+    (while (re-search-forward "[|\\+]" (line-end-position) t)
       ;; Render the right bar.
       (valign--maybe-render-bar (1- (point)))
       (let ((column-width (nth col-idx column-width-list)))
@@ -510,6 +571,7 @@ COLUMN-WIDTH-LIST is returned from
         ((string-match-p "org" (symbol-name major-mode)) 'org)
         ((string-match-p "markdown" (symbol-name major-mode)) 'markdown)
         (t 'org)))
+
 
 ;;; Userland
 
@@ -557,7 +619,10 @@ If FORCE non-nil, force align."
                    (or force
                        (not (memq (or this-command last-command)
                                   valign-not-align-after-list))))
-          (valign-table-1)))
+          (valign--beginning-of-table)
+          (if (valign--guess-charset)
+              (valign--table-2)
+            (valign-table-1))))
     ((valign-bad-cell search-failed error)
      (valign--clean-text-property
       (save-excursion (valign--beginning-of-table) (point))
@@ -582,7 +647,7 @@ If FORCE non-nil, force align."
 
     ;; Align each row.
     (valign--do-row row-idx table-end
-      (re-search-forward "[|\\+]" (line-end-position))
+      (re-search-forward "|" (line-end-position))
       (if (valign--separator-p)
           ;; Separator row.
           (valign--align-separator-row
@@ -596,7 +661,7 @@ If FORCE non-nil, force align."
         (setq column-start (valign--pixel-width-from-to
                             (line-beginning-position) (point) t))
 
-        (valign--do-column column-idx
+        (valign--do-column column-idx "|"
           (save-excursion
             ;; We are after the left bar (“|”).
             ;; Render the left bar.
@@ -651,6 +716,130 @@ If FORCE non-nil, force align."
                                     space-width)))))
         ;; Now we are at the last right bar.
         (valign--maybe-render-bar (1- (point)))))))
+
+(defun valign--table-2 ()
+  "Visually align the table.el table at point."
+  (valign--beginning-of-table)
+  (let* ((charset (valign--guess-charset))
+         (ucharset (alist-get 'unicode valign-box-charset-alist))
+         (char-width (with-silent-modifications
+                       (insert (valign-box-char 1 ucharset))
+                       (prog1 (valign--pixel-width-from-to
+                               (1- (point)) (point))
+                         (backward-delete-char 1))))
+         (table-beg (point))
+         (table-end (save-excursion (valign--end-of-table) (point)))
+         ;; Very hacky, but..
+         (_ (valign--clean-text-property table-beg table-end))
+         (column-width-list
+          ;; Make every width multiples of CHAR-WIDTH.
+          (mapcar (lambda (x)
+                    (* char-width (1+ (/ (- x 16) char-width))))
+                  (valign--calculate-cell-width
+                   table-end (valign-box-char 'v charset))))
+         (row-idx 0)
+         (column-idx 0)
+         (column-start 0))
+    (while (< (point) table-end)
+      (save-excursion
+        (skip-chars-forward " \t")
+        (if (not (equal (char-to-string (char-after))
+                        (valign-box-char 'v charset)))
+            ;; Render separator line.
+            (valign--align-separator-row-full
+             column-width-list
+             (cond ((valign--first-line-p table-beg table-end)
+                    '(1 2 3))
+                   ((valign--last-line-p table-beg table-end)
+                    '(7 8 9))
+                   (t '(4 5 6)))
+             charset char-width)
+          ;; Render normal line.
+          (setq column-start (valign--pixel-width-from-to
+                              (line-beginning-position) (point) t)
+                column-idx 0)
+          (while (search-forward (valign-box-char 'v charset)
+                                 (line-end-position) t)
+            (valign--put-overlay (1- (point)) (point)
+                                 'display (valign-box-char 'v ucharset))
+            (unless (looking-at "\n")
+              (pcase-let ((col-width (nth column-idx column-width-list))
+                          (`(,cell-beg ,content-beg
+                                       ,content-end ,cell-end)
+                           (valign--cell-content-config
+                            (valign-box-char 'v charset))))
+                (valign--put-overlay
+                 content-end cell-end 'display
+                 (valign--space (+ column-start col-width char-width)))
+                (cl-incf column-idx)
+                (setq column-start
+                      (+ column-start col-width char-width)))))))
+      (cl-incf row-idx)
+      (forward-line))))
+
+(defun valign--first-line-p (beg end)
+  "Return t if the point is in the first line between BEG and END."
+  (ignore end)
+  (save-excursion
+    (not (search-backward "\n" beg t))))
+
+(defun valign--last-line-p (beg end)
+  "Return t if the point is in the last line between BEG and END."
+  (ignore beg)
+  (save-excursion
+    (not (search-forward "\n" end t))))
+
+(defun valign--align-separator-row-full
+    (column-width-list codeset charset char-width)
+  "Align separator row for a full table (table.el table).
+
+COLUMN-WIDTH-LIST is a list of column widths.  CODESET is a list
+of codes that corresponds to the left, middle and right box
+drawing character codes to pass to `valign-box-char'.  It can
+be (1 2 3), (4 5 6), or (7 8 9).  CHARSET is the same as in
+`valign-box-charset-alist'.  CHAR-WIDTH is the pixel width of a
+character.
+
+Assumes point before the first character."
+  (let* ((middle (valign-box-char (nth 1 codeset) charset))
+         (right (valign-box-char (nth 2 codeset) charset))
+         ;; UNICODE-CHARSET is used for overlay, CHARSET is used for
+         ;; the physical table.
+         (unicode-charset (alist-get 'unicode valign-box-charset-alist))
+         (uleft (valign-box-char (nth 0 codeset) unicode-charset))
+         (umiddle (valign-box-char (nth 1 codeset) unicode-charset))
+         (uright (valign-box-char (nth 2 codeset) unicode-charset))
+         ;; Aka unicode horizontal.
+         (uh (valign-box-char 'h unicode-charset))
+         (eol (line-end-position))
+         (col-idx 0))
+    (valign--put-overlay (point) (1+ (point)) 'display uleft)
+    (goto-char (1+ (point)))
+    (while (re-search-forward (rx-to-string `(or ,middle ,right)) eol t)
+      ;; Render joints.
+      (if (looking-at "\n")
+          (valign--put-overlay (1- (point)) (point) 'display uright)
+        (valign--put-overlay (1- (point)) (point) 'display umiddle))
+      ;; Render horizontal lines.
+      (save-excursion
+        (let ((p (1- (point)))
+              (width (nth col-idx column-width-list)))
+          (goto-char p)
+          (skip-chars-backward (valign-box-char 'h charset))
+          (valign--put-overlay (point) p 'display
+                               (make-string (/ width char-width)
+                                            (aref uh 0)))))
+      (cl-incf col-idx))))
+
+(defun valign--guess-charset ()
+  "Return the charset used by the table at point.
+Assumes point at the beginning of the table."
+  (cl-loop for charset
+           in (mapcar #'cdr valign-box-charset-alist)
+           if (equal (char-to-string (char-after))
+                     (valign-box-char 1 charset))
+           return charset
+           finally return nil))
 
 ;;; Mode intergration
 
