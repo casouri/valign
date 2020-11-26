@@ -276,7 +276,7 @@ index (0-based)."
            (indent 2))
   `(progn
      (setq ,row-idx-sym 0)
-     (while (<= (point) ,limit)
+     (while (< (point) (min ,limit (point-max)))
        (beginning-of-line)
        ,@body
        (forward-line)
