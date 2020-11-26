@@ -739,7 +739,7 @@ If FORCE non-nil, force align."
 
 (defun valign--table-2 ()
   "Visually align the table.el table at point."
-  ;; Instead of overlays, we use text proeprties in this function.
+  ;; Instead of overlays, we use text properties in this function.
   ;; Too many overlays degrades performance, and we add a whole bunch
   ;; of them in this function, so better use text properties.
   (valign--beginning-of-table)

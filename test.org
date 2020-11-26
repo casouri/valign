@@ -40,6 +40,26 @@
 | 888888888 |
 |         4 |
 
++--+--------------------+-----------------+-----------------------+
+|  |Cardiorespiratory   |Strength         |Flexibility Training   |
+|  |Endurance           |Training         |                       |
++--+--------------------+-----------------+-----------------------+
+|F |Most days of the    |2–3 days/week    |2–3 days/week; ideally |
+|  |week                |non-consecutive  |5–7 days/week          |
++--+--------------------+-----------------+-----------------------+
+|I |55–85% of max heart |Should fatigue   |Feel slight tension    |
+|  |rate                |the muscle       |during the stretch,    |
+|  |                    |                 |but not pain           |
++--+--------------------+-----------------+-----------------------+
+|T |30–60 minutes or 20 |8–12 reps for 1  |2–4 reps holding each  |
+|  |minutes of vigorous |or more sets of  |stretch for 10–30      |
+|  |activity            |8–10 exercises   |seconds                |
++--+--------------------+-----------------+-----------------------+
+|T |Continuous activity |All major muscle |All major joints       |
+|  |that uses large     |groups           |                       |
+|  |muscle groups       |                 |                       |
++--+--------------------+-----------------+-----------------------+
+
 #+latex: : | Table      | Header         | Header |
 |------------+---------------------------------+----|
 | 汉字中文…… | ddddddddddddddddddddddddddddddd | CC |
