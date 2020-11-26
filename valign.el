@@ -434,6 +434,12 @@ PROPS contains properties and values."
     (while props
       (overlay-put ov (pop props) (pop props)))))
 
+(defun valign--put-text-prop (beg end &rest props)
+  "Put text property between BEG and END.
+PROPS contains properties and values."
+  (add-text-properties beg end props)
+  (put-text-property beg end 'valign t))
+
 (defsubst valign--space (xpos)
   "Return a display property that aligns to XPOS."
   `(space :align-to (,xpos)))
@@ -481,10 +487,24 @@ before event, ACTION is either 'entered or 'left."
   "Clean up the display text property between BEG and END."
   (with-silent-modifications
     (put-text-property beg end 'cursor-sensor-functions nil))
+  ;; Remove overlays.
   (let ((ov-list (overlays-in beg end)))
     (dolist (ov ov-list)
       (when (overlay-get ov 'valign)
-        (delete-overlay ov)))))
+        (delete-overlay ov))))
+  ;; Remove text properties.
+  (let ((p beg) tab-end last-p)
+    (while (not (eq p last-p))
+      (setq last-p p
+            p (next-single-char-property-change p 'valign nil end))
+      (when (plist-get (text-properties-at p) 'valign)
+        ;; We are at the beginning of a tab, now find the end.
+        (setq tab-end (next-single-char-property-change
+                       p 'valign nil end))
+        ;; Remove text property.
+        (with-silent-modifications
+          (put-text-property p tab-end 'display nil)
+          (put-text-property p tab-end 'valign nil))))))
 
 (defun valign--glyph-width-of (string point)
   "Return the pixel width of STRING with font at POINT.
@@ -719,6 +739,9 @@ If FORCE non-nil, force align."
 
 (defun valign--table-2 ()
   "Visually align the table.el table at point."
+  ;; Instead of overlays, we use text proeprties in this function.
+  ;; Too many overlays degrades performance, and we add a whole bunch
+  ;; of them in this function, so better use text properties.
   (valign--beginning-of-table)
   (let* ((charset (valign--guess-charset))
          (ucharset (alist-get 'unicode valign-box-charset-alist))
@@ -760,15 +783,16 @@ If FORCE non-nil, force align."
                 column-idx 0)
           (while (search-forward (valign-box-char 'v charset)
                                  (line-end-position) t)
-            (valign--put-overlay (1- (point)) (point)
-                                 'display (valign-box-char 'v ucharset))
+            (valign--put-text-prop
+             (1- (point)) (point)
+             'display (valign-box-char 'v ucharset))
             (unless (looking-at "\n")
               (pcase-let ((col-width (nth column-idx column-width-list))
                           (`(,cell-beg ,content-beg
                                        ,content-end ,cell-end)
                            (valign--cell-content-config
                             (valign-box-char 'v charset))))
-                (valign--put-overlay
+                (valign--put-text-prop
                  content-end cell-end 'display
                  (valign--space (+ column-start col-width char-width)))
                 (cl-incf column-idx)
@@ -813,22 +837,22 @@ Assumes point before the first character."
          (uh (valign-box-char 'h unicode-charset))
          (eol (line-end-position))
          (col-idx 0))
-    (valign--put-overlay (point) (1+ (point)) 'display uleft)
+    (valign--put-text-prop (point) (1+ (point)) 'display uleft)
     (goto-char (1+ (point)))
     (while (re-search-forward (rx-to-string `(or ,middle ,right)) eol t)
       ;; Render joints.
       (if (looking-at "\n")
-          (valign--put-overlay (1- (point)) (point) 'display uright)
-        (valign--put-overlay (1- (point)) (point) 'display umiddle))
+          (valign--put-text-prop (1- (point)) (point) 'display uright)
+        (valign--put-text-prop (1- (point)) (point) 'display umiddle))
       ;; Render horizontal lines.
       (save-excursion
         (let ((p (1- (point)))
               (width (nth col-idx column-width-list)))
           (goto-char p)
           (skip-chars-backward (valign-box-char 'h charset))
-          (valign--put-overlay (point) p 'display
-                               (make-string (/ width char-width)
-                                            (aref uh 0)))))
+          (valign--put-text-prop (point) p 'display
+                                 (make-string (/ width char-width)
+                                              (aref uh 0)))))
       (cl-incf col-idx))))
 
 (defun valign--guess-charset ()
