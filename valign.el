@@ -43,6 +43,7 @@
 ;;; Code:
 ;;
 
+(require 'cl-generic)
 (require 'cl-lib)
 (require 'pcase)
 
