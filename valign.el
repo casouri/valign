@@ -134,8 +134,8 @@ CONTENT-END is
     (max (CELL-END - 1) CELL-BEG)
 
 BAR-CHAR is the separator character (“|”).  It is actually a
-string. Defaults to the normal bar: “|”, but you can provide a
-unicode one for unicode tables.
+string.  Defaults to the normal bar: “|”, but you can provide a
+Unicode one for Unicode tables.
 
 Assumes point is after the left bar (“|”).  Assumes there is a
 right bar."
