@@ -396,7 +396,8 @@ need to specify CHARSET."
     (unless (valign---check-dimension matrix)
       (signal 'valign-parse-error '("Missing rows or columns")))
     (setq matrix (valign--transpose (reverse matrix)))
-    (mapcar (lambda (col) (apply #'max col)) matrix)))
+    ;; Add 8 pixels of padding.
+    (mapcar (lambda (col) (+ (apply #'max col) 8)) matrix)))
 
 (cl-defmethod valign--calculate-alignment ((type (eql markdown)) limit)
   "Return a list of alignments ('left or 'right) for each column.
@@ -793,7 +794,9 @@ Assumes point is at (2).
          (column-width-list
           ;; Make every width multiples of CHAR-WIDTH.
           (mapcar (lambda (x)
-                    (* char-width (1+ (/ (- x 16) char-width))))
+                    ;; Remove the 8 pixels of padding added by
+                    ;; `valign--calculate-cell-width'.
+                    (* char-width (1+ (/ (- x 8) char-width))))
                   (valign--calculate-cell-width table-end charset)))
          (row-idx 0)
          (column-idx 0)
