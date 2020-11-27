@@ -71,10 +71,22 @@
 (require 'cl-lib)
 (require 'pcase)
 
+(defgroup valign
+  '((valign-lighter custom-variable)
+    (valign-fancy-bar custom-variable))
+  "Visually align text tables on GUI."
+  :group 'text)
+
 (defcustom valign-lighter " valign"
   "The lighter string used by function `valign-mode'."
-  :group 'valign
   :type 'string)
+
+(defcustom valign-fancy-bar nil
+  "Non-nil means to render bar as a full-height line.
+You need to restart valign mode for this setting to take effect."
+  :type '(choice
+          (const :tag "Enable fancy bar" t)
+          (const :tag "Disable fancy bar" nil)))
 
 ;;; Backstage
 
@@ -964,14 +976,6 @@ FLAG is the same as in ‘org-flag-region’."
     (advice-remove fn #'valign--flag-region-advice)))
 
 ;;; Userland
-
-(defcustom valign-fancy-bar nil
-  "Non-nil means to render bar as a full-height line.
-You need to restart valign mode for this setting to take effect."
-  :type '(choice
-          (const :tag "Enable fancy bar" t)
-          (const :tag "Disable fancy bar" nil))
-  :group 'valign)
 
 ;;;###autoload
 (defun valign-table ()
