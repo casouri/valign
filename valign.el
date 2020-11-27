@@ -21,6 +21,10 @@
 ;; you want to automatically enable this mode, add `valign-mode' to a
 ;; major mode hook like `org-mode-hook'.
 ;;
+;; For table.el tables to work with valign, each cell has to have at
+;; least one space on the right.  You can use ftable.el to fill the
+;; table for you.
+;;
 ;; TODO:
 ;;
 ;; - Hidden links in markdown still occupy the full length of the link

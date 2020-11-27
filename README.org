@@ -15,6 +15,10 @@ To use this package, load it and add ~valign-mode~ to ~org-mode-hook~ or ~markdo
 - Hidden links in markdown still occupy the full length of the link, because it uses character composition which we don’t support now.
 - Rendering large tables (≥100 lines) is laggy.
 
+*Note:*
+
+For table.el tables to work with valign, each cell has to have at least one space on the right.  You can use [[https://github.com/casouri/ftable][ftable.el]] to fill the table for you.
+
 * Install with quelpa
 
 Firmin Martin kindly provided this snippet:
