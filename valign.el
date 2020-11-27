@@ -22,8 +22,8 @@
 ;; major mode hook like `org-mode-hook'.
 ;;
 ;; For table.el tables to work with valign, each cell has to have at
-;; least one space on the right.  You can use ftable.el to fill the
-;; table for you.
+;; least one space on the right and no space on the left.  You can use
+;; ftable.el to auto-layout the table for you.
 ;;
 ;; TODO:
 ;;
