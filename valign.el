@@ -78,9 +78,9 @@
 
 ;;; Backstage
 
-(define-error 'valign-bad-cell "Valign encountered a invalid table cell")
 (define-error 'valign-not-gui "Valign only works in GUI environment")
 (define-error 'valign-not-on-table "Valign is asked to align a table, but the point is not on one")
+(define-error 'valign-parse-error "Valign cannot parse the table")
 
 ;;;; Table.el tables
 
@@ -140,7 +140,7 @@ Doesn’t check if we are in a cell."
     (if (looking-at " [^ ]")
         'left
       (if (not (search-forward "|" nil t))
-          (signal 'valign-bad-cell nil)
+          (signal 'valign-parse-error '("Missing the right bar (|)"))
         (if (looking-back
              "[^ ] |" (max (- (point) 3) (point-min)))
             'right
@@ -170,9 +170,12 @@ right bar."
   (save-excursion
     (let* ((bar-char (or bar-char "|"))
            (cell-beg (point))
-           (cell-end (save-excursion
-                       (search-forward bar-char (line-end-position))
-                       (match-beginning 0)))
+           (cell-end
+            (save-excursion
+              (unless (search-forward bar-char (line-end-position) t)
+                (signal 'valign-parse-error
+                        '("Missing the right bar (|)")))
+              (match-beginning 0)))
            ;; `content-beg-strict' is the beginning of the content
            ;; excluding any white space. Same for `content-end-strict'.
            content-beg-strict content-end-strict)
@@ -189,6 +192,9 @@ right bar."
         (goto-char cell-end)
         (skip-chars-backward " ")
         (setq content-end-strict (point))
+        (when (and (= content-beg-strict cell-beg)
+                   (= content-end-strict cell-end))
+          (signal 'valign-parse-error `("The cell should contain at least one space" ,(buffer-substring-no-properties (1- cell-beg) (1+ cell-end)))))
         ;; Calculate delimiters. Basically, we try to preserve a white
         ;; space on the either side of the content, i.e., include them
         ;; in (BEG . END). Because if you are typing in a cell and
@@ -334,6 +340,16 @@ column (0-based)."
            (cl-loop for row in matrix
                     collect (nth col-idx row))))
 
+(defun valign---check-dimension (matrix)
+  "Check that the dimension of MATRIX is correct.
+Correct dimension means each row has the same number of columns.
+Return t if the dimension is correct, nil if not."
+  (let ((first-row-column-count (length (car matrix))))
+    (cl-loop for row in (cdr matrix)
+             if (not (eq first-row-column-count (length row)))
+             return nil
+             finally return t)))
+
 (defun valign--separator-line-p (&optional charset)
   "Return t if this line is a separator line.
 If the table is a table.el table, you need to specify CHARSET.
@@ -343,7 +359,8 @@ Assumes the point is at the beginning of the line."
           (rx-to-string `(or ,(valign-box-char 1 charset)
                              ,(valign-box-char 4 charset)
                              ,(valign-box-char 7 charset)
-                             ,(valign-box-char 'v charset))))
+                             ,(valign-box-char 'v charset)))
+          (line-end-position) t)
          (valign--separator-p))))
 
 (defun valign--calculate-cell-width (limit &optional charset)
@@ -363,6 +380,9 @@ need to specify CHARSET."
             ;; Point is after the left “|”.
             (push (valign--cell-nonempty-width bar-char) row))
           (push (reverse row) matrix))))
+    ;; Sanity check.
+    (unless (valign---check-dimension matrix)
+      (signal 'valign-parse-error '("Missing rows or columns")))
     (setq matrix (valign--transpose (reverse matrix)))
     (mapcar (lambda (col) (apply #'max col)) matrix)))
 
@@ -379,6 +399,9 @@ TYPE must be 'markdown.  Start at point, stop at LIMIT."
           (valign--do-column column-idx "|"
             (push (valign--alignment-from-seperator) row))
           (push (reverse row) matrix))))
+    ;; Sanity check.
+    (unless (valign---check-dimension matrix)
+      (signal 'valign-parse-error '("Missing rows or columns")))
     (setq matrix (valign--transpose (reverse matrix)))
     (or matrix
         (dotimes (_ column-idx matrix)
@@ -400,6 +423,9 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
           (valign--do-column column-idx "|"
             (push (valign--cell-alignment) row))
           (push (reverse row) matrix)))
+      ;; Sanity check.
+      (unless (valign---check-dimension matrix)
+        (signal 'valign-parse-error '("Missing rows or columns")))
       (setq matrix (valign--transpose (reverse matrix)))
       ;; For each column, we take the majority.
       (mapcar (lambda (col)
@@ -617,12 +643,11 @@ If FORCE non-nil, force align."
           (if (valign--guess-charset)
               (valign--table-2)
             (valign-table-1))))
-    ((valign-bad-cell search-failed error)
+    ((valign-parse-error error)
      (valign--clean-text-property
       (save-excursion (valign--beginning-of-table) (point))
       (save-excursion (valign--end-of-table) (point)))
-     (when (eq (car err) 'error)
-       (error (error-message-string err))))))
+     (message "%s" (error-message-string err)))))
 
 (defun valign-table-1 ()
   "Visually align the table at point."
@@ -641,7 +666,8 @@ If FORCE non-nil, force align."
 
     ;; Align each row.
     (valign--do-row row-idx table-end
-      (re-search-forward "|" (line-end-position))
+      (unless (search-forward "|" (line-end-position) t)
+        (signal 'valign-parse-error '("Missing the right bar (|)")))
       (if (valign--separator-p)
           ;; Separator row.
           (valign--align-separator-row column-width-list)
