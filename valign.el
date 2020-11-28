@@ -977,10 +977,23 @@ FLAG is the same as in ‘org-flag-region’."
                 markdown-cycle))
     (advice-remove fn #'valign--tab-advice))
   (dolist (fn '(text-scale-increase
-                text-scale-decrease))
+                text-scale-decrease
+                org-toggle-inline-images))
     (advice-remove fn #'valign--buffer-advice))
   (dolist (fn '(org-flag-region outline-flag-region))
-    (advice-remove fn #'valign--flag-region-advice)))
+    (advice-remove fn #'valign--flag-region-advice))
+  (when (featurep 'org-indent)
+    (advice-remove 'org-indent-initialize-agent
+                   #'valign--org-indent-advice)))
+
+(defun valign--maybe-clean-advice ()
+  "Remove advices if there is no buffer with valign-mode enabled.
+This runs in `kill-buffer-hook'."
+  (when (eq 1 (cl-count-if
+               (lambda (buf)
+                 (buffer-local-value 'valign-mode buf))
+               (buffer-list)))
+    (valign-remove-advice)))
 
 ;;; Userland
 
@@ -1019,18 +1032,18 @@ FLAG is the same as in ‘org-flag-region’."
             (advice-add fn :after #'valign--buffer-advice))
           (dolist (fn '(org-flag-region outline-flag-region))
             (advice-add fn :after #'valign--flag-region-advice))
-          (with-eval-after-load 'org-indent
+          (when (featurep 'org-indent)
             (advice-add 'org-indent-initialize-agent
                         :after #'valign--org-indent-advice))
           (add-hook 'org-indent-mode-hook #'valign--buffer-advice 0 t)
+          (add-hook 'kill-buffer-hook #'valign--maybe-clean-advice 0 t)
           (if valign-fancy-bar (cursor-sensor-mode))
           (jit-lock-refontify))
-      (with-eval-after-load 'org-indent
-        (advice-remove 'org-indent-initialize-agent
-                       #'valign--org-indent-advice))
       (remove-hook 'jit-lock-functions #'valign-region t)
+      (remove-hook 'kill-buffer-hook #'valign--maybe-clean-advice t)
       (valign-reset-buffer)
-      (cursor-sensor-mode -1))))
+      (cursor-sensor-mode -1)
+      (valign--maybe-clean-advice))))
 
 (provide 'valign)
 
