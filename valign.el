@@ -480,7 +480,8 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
                       for charset = (cdr elt)
                       collect (valign-box-char 1 charset)
                       collect (valign-box-char 4 charset)
-                      collect (valign-box-char 7 charset))
+                      collect (valign-box-char 7 charset)
+                      collect (valign-box-char 'v charset))
              '("|")))))
 
 (defun valign--align-p ()
@@ -515,10 +516,9 @@ Assumes point is on a table."
     (while (and (< (point) (point-max))
                 (valign--at-table-p))
       (forward-line 1))
-    (when (unless (eq (point) start))
+    (unless (<= (point) start)
       (skip-chars-backward "\n"))
     (when (< (point) start)
-      (debug (point) start)
       (error "End of table goes backwards"))))
 
 (defun valign--put-overlay (beg end &rest props)
