@@ -3,7 +3,7 @@
 ;; Author: Yuan Fu <casouri@gmail.com>
 ;; URL: https://github.com/casouri/valign
 ;; Version: 2.3.0
-;; Keywords: convenience
+;; Keywords: convenience, text, table
 ;; Package-Requires: ((emacs "26.0"))
 
 ;;; This file is NOT part of GNU Emacs
