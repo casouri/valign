@@ -473,21 +473,26 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
   "Return non-nil if point is in a table."
   (save-excursion
     (beginning-of-line)
+    (skip-chars-forward " \t")
+    (member (char-to-string (char-after))
+            (append
+             (cl-loop for elt in valign-box-charset-alist
+                      for charset = (cdr elt)
+                      collect (valign-box-char 1 charset)
+                      collect (valign-box-char 4 charset)
+                      collect (valign-box-char 7 charset))
+             '("|")))))
+
+(defun valign--align-p ()
+  "Return non-nil if we should align the table at point."
+  (save-excursion
+    (beginning-of-line)
     (let ((face (plist-get (text-properties-at (point)) 'face)))
-      (and (progn (skip-chars-forward " \t")
-                  (member (char-to-string (char-after))
-                          (append
-                           (cl-loop for elt in valign-box-charset-alist
-                                    for charset = (cdr elt)
-                                    collect (valign-box-char 1 charset)
-                                    collect (valign-box-char 4 charset)
-                                    collect (valign-box-char 7 charset))
-                           '("|"))))
-           ;; Don’t align tables in org blocks.
-           (not (and (consp face)
-                     (or (equal face '(org-block))
-                         (equal (plist-get face :inherit)
-                                '(org-block)))))))))
+      ;; Don’t align tables in org blocks.
+      (not (and (consp face)
+                (or (equal face '(org-block))
+                    (equal (plist-get face :inherit)
+                           '(org-block))))))))
 
 (defun valign--beginning-of-table ()
   "Go backward to the beginning of the table at point.
@@ -505,10 +510,16 @@ Assumes point is on a table."
 (defun valign--end-of-table ()
   "Go forward to the end of the table at point.
 Assumes point is on a table."
-  (end-of-line)
-  (if (not (search-forward "\n\n" nil t))
-      (goto-char (point-max)))
-  (skip-chars-backward "\n"))
+  (let ((start (point)))
+    (beginning-of-line)
+    (while (and (< (point) (point-max))
+                (valign--at-table-p))
+      (forward-line 1))
+    (when (unless (eq (point) start))
+      (skip-chars-backward "\n"))
+    (when (< (point) start)
+      (debug (point) start)
+      (error "End of table goes backwards"))))
 
 (defun valign--put-overlay (beg end &rest props)
   "Put overlay between BEG and END.
@@ -522,8 +533,9 @@ PROPS contains properties and values."
 (defun valign--put-text-prop (beg end &rest props)
   "Put text property between BEG and END.
 PROPS contains properties and values."
-  (add-text-properties beg end props)
-  (put-text-property beg end 'valign t))
+  (with-silent-modifications
+    (add-text-properties beg end props)
+    (put-text-property beg end 'valign t)))
 
 (defsubst valign--space (xpos)
   "Return a display property that aligns to XPOS."
@@ -663,21 +675,25 @@ COLUMN-WIDTH-LIST is returned by `valign--calculate-cell-width'."
                                       kill-word)
   "Valign doesn’t align table after these commands.")
 
-(defun valign-table-maybe (&optional force)
+(defun valign-table-maybe (&optional force go-to-end)
   "Visually align the table at point.
-If FORCE non-nil, force align."
+If FORCE non-nil, force align.  If GO-TO-END non-nil, leave point
+at the end of the table."
   (condition-case err
-      (save-excursion
-        (when (and (display-graphic-p)
-                   (valign--at-table-p)
-                   (or force
-                       (not (memq (or this-command last-command)
-                                  valign-not-align-after-list))))
+      (when (and (display-graphic-p)
+                 (valign--at-table-p)
+                 (valign--align-p)
+                 (or force
+                     (not (memq (or this-command last-command)
+                                valign-not-align-after-list))))
+        (save-excursion
           (valign--beginning-of-table)
           (if (valign--guess-charset)
               (valign--table-2)
-            (valign-table-1))))
-    ((valign-parse-error error)
+            (valign-table-1)))
+        (when go-to-end (valign--end-of-table)))
+
+    ((debug valign-parse-error error)
      (valign--clean-text-property
       (save-excursion (valign--beginning-of-table) (point))
       (save-excursion (valign--end-of-table) (point)))
@@ -935,17 +951,21 @@ Force align if FORCE non-nil."
   ;; need ‘window-text-pixel-size’ to calculate text size.
   (let* ((beg (or beg (point-min)))
          (end (or end (point-max)))
-         (fontified-end end))
+         (fontified-end end)
+         (table-beg-list
+          (cons "|" (cl-loop for elt in valign-box-charset-alist
+                             for charset = (cdr elt)
+                             collect (valign-box-char 1 charset))))
+         (table-re (rx-to-string `(or ,@table-beg-list))))
     (when (window-live-p (get-buffer-window nil (selected-frame)))
       (save-excursion
         (goto-char beg)
-        (while (and (search-forward "|" nil t)
-                    (< (point) end))
+        (while (and (< (point) end)
+                    (re-search-forward table-re end t))
           (condition-case err
-              (valign-table-maybe)
+              (valign-table-maybe nil t)
             (error (message "Error when aligning table: %s"
                             (error-message-string err))))
-          (valign--end-of-table)
           (setq fontified-end (point)))))
     (cons 'jit-lock-bounds (cons beg (max end fontified-end)))))
 
@@ -977,7 +997,8 @@ FLAG is the same as in ‘org-flag-region’."
 (defun valign--tab-advice (&rest _)
   "Force realign after tab so user can force realign."
   (when (and valign-mode
-             (valign--at-table-p))
+             (valign--at-table-p)
+             (valign--align-p))
     (valign-table)))
 
 (defun valign-reset-buffer ()
