@@ -80,10 +80,11 @@
 |------------+---------------------------------+----|
 | 汉字中文…… | ddddddddddddddddddddddddddddddd | CC |
 | Serif……    | Variable width                  |    |
+#+latex: : Table 
 
 | Peace          | August       | Love |
 |----------------+--------------+------|
-| ssh tunnel     | woome        |   23f |
+| ssh tunnel     | woome        |  23f |
 | 对齐等宽       | 日本語もいい |   89 |
 | 中文汉字       | 感动         |  133 |
 | rgfe           | 图片         |   12 |
