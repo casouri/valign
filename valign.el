@@ -593,10 +593,8 @@ before event, ACTION is either 'entered or 'left."
       (when (overlay-get ov 'valign)
         (delete-overlay ov))))
   ;; Remove text properties.
-  (let ((p beg) tab-end last-p)
+  (let ((p beg) tab-end (last-p -1))
     (while (not (eq p last-p))
-      (setq last-p p
-            p (next-single-char-property-change p 'valign nil end))
       (when (plist-get (text-properties-at p) 'valign)
         ;; We are at the beginning of a tab, now find the end.
         (setq tab-end (next-single-char-property-change
@@ -604,7 +602,9 @@ before event, ACTION is either 'entered or 'left."
         ;; Remove text property.
         (with-silent-modifications
           (put-text-property p tab-end 'display nil)
-          (put-text-property p tab-end 'valign nil))))))
+          (put-text-property p tab-end 'valign nil)))
+      (setq last-p p
+            p (next-single-char-property-change p 'valign nil end)))))
 
 (defun valign--glyph-width-of (string point)
   "Return the pixel width of STRING with font at POINT.
@@ -822,15 +822,17 @@ Assumes point is at (2).
   (valign--beginning-of-table)
   (let* ((charset (valign--guess-charset))
          (ucharset (alist-get 'unicode valign-box-charset-alist))
-         (char-width (with-silent-modifications
-                       (insert (valign-box-char 1 ucharset))
-                       (prog1 (valign--pixel-width-from-to
-                               (1- (point)) (point))
-                         (backward-delete-char 1))))
          (table-beg (point))
          (table-end (save-excursion (valign--end-of-table) (point)))
          ;; Very hacky, but..
          (_ (valign--clean-text-property table-beg table-end))
+         ;; Measure char width after cleaning text properties.
+         ;; Otherwise the measurement is not accurate.
+         (char-width (with-silent-modifications
+                       (insert (valign-box-char 'h ucharset))
+                       (prog1 (valign--pixel-width-from-to
+                               (1- (point)) (point))
+                         (backward-delete-char 1))))
          (column-width-list
           ;; Make every width multiples of CHAR-WIDTH.
           (mapcar (lambda (x)
