@@ -437,9 +437,10 @@ TYPE must be 'markdown.  Start at point, stop at LIMIT."
     (unless (valign---check-dimension matrix)
       (signal 'valign-parse-error '("Missing rows or columns")))
     (setq matrix (valign--transpose (reverse matrix)))
-    (or matrix
-        (dotimes (_ column-idx matrix)
-          (push 'left matrix)))))
+    (if matrix
+        (mapcar #'car matrix)
+      (dotimes (_ (or column-idx 0) matrix)
+        (push 'left matrix)))))
 
 (cl-defmethod valign--calculate-alignment ((type (eql org)) limit)
   "Return a list of alignments ('left or 'right) for each column.
