@@ -1,7 +1,6 @@
 ;;; valign.el --- Visually align tables      -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2019-2020 Free Software
-;; Foundation, Inc.
+;; Copyright (C) 2019-2020 Free Software Foundation, Inc.
 
 ;; Author: Yuan Fu <casouri@gmail.com>
 ;; Maintainer: Yuan Fu <casouri@gmail.com>
