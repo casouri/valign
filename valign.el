@@ -207,7 +207,9 @@ right bar."
             (save-excursion
               (unless (search-forward bar-char (line-end-position) t)
                 (signal 'valign-parse-error
-                        '("Missing the right bar (|)")))
+                        (list (format
+                               "Missing the right bar (|) around %d"
+                               (line-end-position)))))
               (match-beginning 0)))
            ;; `content-beg-strict' is the beginning of the content
            ;; excluding any white space. Same for `content-end-strict'.
