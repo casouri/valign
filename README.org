@@ -19,16 +19,13 @@ To use this package, load it and add ~valign-mode~ to ~org-mode-hook~ or ~markdo
 
 For table.el tables to work with valign, each cell has to have at least one space on the right and no space on the left.  You can use [[https://github.com/casouri/ftable][ftable.el]] to auto-layout the table for you.
 
-* Install with quelpa
+* Install
 
-Firmin Martin kindly provided this snippet:
-#+begin_src emacs-lisp
-(use-package valign
-  :quelpa (valign :fetcher github :repo "casouri/valign")
-  :ensure t
-  :config
-  (add-hook 'org-mode-hook #'valign-mode))
+You can obtain valign.el from GNU ELPA by typing:
+#+begin_src 
+M-x package-install RET valign RET
 #+end_src
+
 
 * Customization
 Set ~valign-fancy-bar~ to ~non-nil~:
