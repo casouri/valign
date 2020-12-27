@@ -14,6 +14,7 @@ To use this package, load it and add ~valign-mode~ to ~org-mode-hook~ or ~markdo
 *Know problems:*
 - Hidden links in markdown still occupy the full length of the link, because it uses character composition which we don’t support now.
 - Rendering large tables (≥100 lines) is laggy.
+- ~org-indent-mode~ plus ~display-line-numbers-mode~ causes alignment problems.
 
 *Note:*
 
@@ -26,13 +27,16 @@ You can obtain valign.el from GNU ELPA by typing:
 M-x package-install RET valign RET
 #+end_src
 
-
 * Customization
 Set ~valign-fancy-bar~ to ~non-nil~:
 
 [[./fancy-bar.png]]
 
 This only affects Org Mode and Markdown tables.
+
+By default, valign doesn’t re-align the table after normal edit commands like ~self-insert-command~ and ~backward-kill-word~. If you want valign to not re-align the table after a certain command, add that command to ~valign-not-align-after-list~.
+
+Because valign isn’t particularly efficient, it doesn’t align tables larger than 4000 characters in size. If you want to change that behavior, customize ~valign-max-table-size~. Valign puts ~valign-table-fallback~ face on those large tables.
 
 * If function advice makes you itch
 ~valign-mode~ adds advice and doesn’t remove them even if you close ~valign-mode~ because function advice is global and ~valign-mode~ is local. If you want to remove the advice, use ~valign-remove-advice~. If you run this while some buffer still has ~valign-mode~ on, they break.

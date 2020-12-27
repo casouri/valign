@@ -45,6 +45,22 @@
 ;;
 ;; - Hidden links in markdown still occupy the full length of the link
 ;;   because it uses character composition, which we don’t support.
+;;
+;; Customization
+;;
+;; valign-fancy-bar               If non-nil, use pretty vertical bars.
+;; valign-not-align-after-list    Valign doesn't align after these
+;;                                commands.
+;; valign-signal-parse-error      If non-nil, emit parse errors.
+;; valign-max-table-size          Valign doesn't align tables of size
+;;                                larger than this value.
+;; valign-table-fallback          Face for tables that are not aligned
+;;                                because of their size.
+;;
+;; Uninteresting variables
+;;
+;; valign-lighter
+;; valign-box-charset-alist
 
 ;;; Developer:
 ;;
@@ -672,17 +688,31 @@ COLUMN-WIDTH-LIST is returned by `valign--calculate-cell-width'."
 
 ;;; Align
 
-(defvar valign-not-align-after-list '(self-insert-command
-                                      org-self-insert-command
-                                      markdown-outdent-or-delete
-                                      org-delete-backward-char
-                                      backward-kill-word
-                                      delete-char
-                                      kill-word)
-  "Valign doesn’t align table after these commands.")
+(defcustom valign-not-align-after-list '(self-insert-command
+                                         org-self-insert-command
+                                         markdown-outdent-or-delete
+                                         org-delete-backward-char
+                                         backward-kill-word
+                                         delete-char
+                                         kill-word)
+  "Valign doesn’t align table after these commands."
+  :type '(list symbol)
+  :group 'valign)
 
 (defvar valign-signal-parse-error nil
   "When non-nil, signal parse error.")
+
+(defcustom valign-max-table-size 4000
+  "Valign doesn't align tables of size larger than this value.
+Valign puts `valign-table-fallback' face onto these tables.  If the
+value is zero, valign doesn't check for table sizes."
+  :type 'integer
+  :group 'valign)
+
+(defface valign-table-fallback
+  '((t . (:inherit fixed-pitch)))
+  "Fallback face for tables whose size exceeds `valign-max-table-size'."
+  :group 'valign)
 
 (defun valign-table-maybe (&optional force go-to-end)
   "Visually align the table at point.
@@ -697,9 +727,19 @@ at the end of the table."
                                 valign-not-align-after-list))))
         (save-excursion
           (valign--beginning-of-table)
-          (if (valign--guess-charset)
-              (valign--table-2)
-            (valign-table-1)))
+          (let ((table-beg (point))
+                (table-end (save-excursion
+                             (valign--end-of-table)
+                             (point))))
+            (if (or (eq valign-max-table-size 0)
+                    (<= (- table-end table-beg) valign-max-table-size))
+                (if (valign--guess-charset)
+                    (valign--table-2)
+                  (valign-table-1))
+              ;; Can't align the table, put fallback-face on.
+              (valign--clean-text-property table-beg table-end)
+              (valign--put-overlay table-beg table-end
+                                   'face 'valign-table-fallback))))
         (when go-to-end (valign--end-of-table)))
 
     ((debug valign-parse-error error)
