@@ -681,6 +681,9 @@ COLUMN-WIDTH-LIST is returned by `valign--calculate-cell-width'."
                                       kill-word)
   "Valign doesn’t align table after these commands.")
 
+(defvar valign-signal-parse-error nil
+  "When non-nil, signal parse error.")
+
 (defun valign-table-maybe (&optional force go-to-end)
   "Visually align the table at point.
 If FORCE non-nil, force align.  If GO-TO-END non-nil, leave point
@@ -703,7 +706,11 @@ at the end of the table."
      (valign--clean-text-property
       (save-excursion (valign--beginning-of-table) (point))
       (save-excursion (valign--end-of-table) (point)))
-     (message "%s" (error-message-string err)))))
+     ;; Ignore parse error when not in debug mode.
+     (if (and (not valign-signal-parse-error)
+              (eq (car err) 'valign-parse-error))
+         nil
+       (signal (car err) (cdr err))))))
 
 (defun valign-table-1 ()
   "Visually align the table at point."
