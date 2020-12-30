@@ -311,27 +311,33 @@ properties must be cleaned before using this.
 
 If WITH-PREFIX is non-nil, don’t subtract the width of line
 prefix."
-  (let* ((window (get-buffer-window))
-         ;; This computes the prefix width.  This trick doesn’t seem
-         ;; work if the point is at the beginning of a line, so we use
-         ;; TO instead of FROM.
-         ;;
-         ;; Why all this fuss: Org puts some display property on white
-         ;; spaces in a cell: (space :relative-width 1).  And that
-         ;; messes up the calculation of prefix: now it returns the
-         ;; width of a space instead of 0 when there is no line
-         ;; prefix.  So we move the test point around until it doesn’t
-         ;; sit on a character with display properties.
-         (line-prefix
-          (let ((pos to))
-            (while (get-char-property pos 'display)
-              (cl-decf pos))
-            (car (window-text-pixel-size window pos pos)))))
-    (- (car (window-text-pixel-size window from to))
-       (if with-prefix 0 line-prefix)
-       (if (bound-and-true-p display-line-numbers-mode)
-           (line-number-display-width 'pixel)
-         0))))
+  ;; HACK: You would expect (window-text-pixel-size WINDOW FROM TO) to
+  ;; return line-number-display-width when FROM equals to TO, but no,
+  ;; it returns 0.  Then if we still subtract line number width, we
+  ;; get a negative number.  So if FROM = TO, we simply return 0.
+  (if (eq from to)
+      0
+    (let* ((window (get-buffer-window))
+           ;; This computes the prefix width.  This trick doesn’t seem
+           ;; work if the point is at the beginning of a line, so we use
+           ;; TO instead of FROM.
+           ;;
+           ;; Why all this fuss: Org puts some display property on
+           ;; white spaces in a cell: like (space :relative-width 1).
+           ;; That messes up the calculation of the prefix: now it
+           ;; returns the width of a space instead of 0 when there is
+           ;; no line prefix.  So we move the test point around until
+           ;; it doesn’t sit on a character with display properties.
+           (line-prefix
+            (let ((pos to))
+              (while (get-char-property pos 'display)
+                (cl-decf pos))
+              (car (window-text-pixel-size window pos pos)))))
+      (- (car (window-text-pixel-size window from to))
+         (if with-prefix 0 line-prefix)
+         (if (bound-and-true-p display-line-numbers-mode)
+             (line-number-display-width 'pixel)
+           0)))))
 
 (defun valign--separator-p ()
   "If the current cell is actually a separator.
