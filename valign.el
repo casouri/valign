@@ -303,41 +303,26 @@ width.  BAR-CHAR is the bar character (“|”)."
 ;; has some limitations, including not working right with face remapping.
 ;; With this function we can avoid some of them.  However we still can’t
 ;; get the true tab width, see comment in ‘valgn--tab-width’ for more.
-(defun valign--pixel-width-from-to (from to &optional with-prefix)
+(defun valign--pixel-width-from-to (from to)
   "Return the width of the glyphs from FROM (inclusive) to TO (exclusive).
 The buffer has to be in a live window.  FROM has to be less than
 TO and they should be on the same line.  Valign display
-properties must be cleaned before using this.
-
-If WITH-PREFIX is non-nil, don’t subtract the width of line
-prefix."
+properties must be cleaned before using this."
   ;; HACK: You would expect (window-text-pixel-size WINDOW FROM TO) to
   ;; return line-number-display-width when FROM equals to TO, but no,
   ;; it returns 0.  Then if we still subtract line number width, we
   ;; get a negative number.  So if FROM = TO, we simply return 0.
   (if (eq from to)
       0
-    (let* ((window (get-buffer-window))
-           ;; This computes the prefix width.  This trick doesn’t seem
-           ;; work if the point is at the beginning of a line, so we use
-           ;; TO instead of FROM.
-           ;;
-           ;; Why all this fuss: Org puts some display property on
-           ;; white spaces in a cell: like (space :relative-width 1).
-           ;; That messes up the calculation of the prefix: now it
-           ;; returns the width of a space instead of 0 when there is
-           ;; no line prefix.  So we move the test point around until
-           ;; it doesn’t sit on a character with display properties.
-           (line-prefix
-            (let ((pos to))
-              (while (get-char-property pos 'display)
-                (cl-decf pos))
-              (car (window-text-pixel-size window pos pos)))))
-      (- (car (window-text-pixel-size window from to))
-         (if with-prefix 0 line-prefix)
-         (if (bound-and-true-p display-line-numbers-mode)
-             (line-number-display-width 'pixel)
-           0)))))
+    (- (car (window-text-pixel-size
+             nil (line-beginning-position) to))
+       (car (window-text-pixel-size
+             nil (line-beginning-position) from)))))
+
+(defun valign--pixel-x (point)
+  "Return the x pixel position of POINT."
+  (- (car (window-text-pixel-size nil (line-beginning-position) point))
+     (line-number-display-width 'pixel)))
 
 (defun valign--separator-p ()
   "If the current cell is actually a separator.
@@ -668,8 +653,7 @@ COLUMN-WIDTH-LIST is returned by `valign--calculate-cell-width'."
         (space-width (valign--glyph-width-of " " (point)))
         (column-start (point))
         (col-idx 0)
-        (pos (valign--pixel-width-from-to
-              (line-beginning-position) (point) t)))
+        (pos (valign--pixel-x (point))))
     ;; Render the first left bar.
     (valign--maybe-render-bar (1- (point)))
     ;; Add overlay in each column.
@@ -784,8 +768,7 @@ at the end of the table."
         ;; Not separator row, align each cell. ‘column-start’ is the
         ;; pixel position of the current point, i.e., after the left
         ;; bar.
-        (setq column-start (valign--pixel-width-from-to
-                            (line-beginning-position) (point) t))
+        (setq column-start (valign--pixel-x (point)))
 
         (valign--do-column column-idx "|"
           (save-excursion
@@ -914,8 +897,7 @@ Assumes point is at (2).
                    (t '(4 5 6)))
              charset char-width)
           ;; Render normal line.
-          (setq column-start (valign--pixel-width-from-to
-                              (line-beginning-position) (point) t)
+          (setq column-start (valign--pixel-x (point))
                 column-idx 0)
           (while (search-forward (valign-box-char 'v charset)
                                  (line-end-position) t)
