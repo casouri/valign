@@ -483,17 +483,28 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
   (save-excursion
     (beginning-of-line)
     (skip-chars-forward " \t")
-    (or (eq (char-after) ?|)
-        (and (member (char-to-string (char-after))
-                     (cl-loop for elt in valign-box-charset-alist
-                              for charset = (cdr elt)
-                              collect (valign-box-char 1 charset)
-                              collect (valign-box-char 4 charset)
-                              collect (valign-box-char 7 charset)
-                              collect (valign-box-char 'v charset)))
-             ;; Exclude +<space> (someone uses + as a bullet), not
-             ;; bullet proof but good enough for now.
-             (not (eq (char-after (1+ (point))) ?\s))))))
+    ;; Org mode table.
+    (let ((char (char-to-string (char-after)))
+          (char2 (char-to-string (or (char-after (1+ (point))) ""))))
+      (or (equal char "|")
+          (cl-loop
+           for elt in valign-box-charset-alist
+           for charset = (cdr elt)
+           if (or (equal char (valign-box-char 'v charset))
+                  (and (equal char
+                              (valign-box-char 1 charset))
+                       (member char2
+                               (list (valign-box-char 2 charset)
+                                     (valign-box-char 3 charset)
+                                     (valign-box-char 'h charset))))
+                  (and (equal char
+                              (valign-box-char 7 charset))
+                       (member char2
+                               (list (valign-box-char 8 charset)
+                                     (valign-box-char 9 charset)
+                                     (valign-box-char 'h charset)))))
+           return t
+           finally return nil)))))
 
 (defun valign--align-p ()
   "Return non-nil if we should align the table at point."
