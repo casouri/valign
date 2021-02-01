@@ -252,10 +252,10 @@ right bar."
         ;; as cell content, rather than to consider it as part of the
         ;; padding and add overlay over it.
         (list cell-beg
-              (if (= (- content-beg-strict cell-beg) 1)
+              (if (<= (- content-beg-strict cell-beg) 1)
                   content-beg-strict
                 (1- content-beg-strict))
-              (if (= (- cell-end content-end-strict) 1)
+              (if (<= (- cell-end content-end-strict) 1)
                   content-end-strict
                 (1+ content-end-strict))
               cell-end)))))
@@ -308,16 +308,16 @@ width.  BAR-CHAR is the bar character (“|”)."
 The buffer has to be in a live window.  FROM has to be less than
 TO and they should be on the same line.  Valign display
 properties must be cleaned before using this."
-  ;; HACK: You would expect (window-text-pixel-size WINDOW FROM TO) to
-  ;; return line-number-display-width when FROM equals to TO, but no,
-  ;; it returns 0.  Then if we still subtract line number width, we
-  ;; get a negative number.  So if FROM = TO, we simply return 0.
-  (if (eq from to)
-      0
-    (- (car (window-text-pixel-size
-             nil (line-beginning-position) to))
-       (car (window-text-pixel-size
-             nil (line-beginning-position) from)))))
+  (- (car (window-text-pixel-size
+           nil (line-beginning-position) to))
+     (+ (car (window-text-pixel-size
+              nil (line-beginning-position) from))
+        ;; HACK: You would expect (window-text-pixel-size WINDOW
+        ;; FROM TO) to return line-number-display-width when FROM
+        ;; equals to TO, but no, it returns 0.
+        (if (eq (line-beginning-position) from)
+            (line-number-display-width 'pixel)
+          0))))
 
 (defun valign--pixel-x (point)
   "Return the x pixel position of POINT."
