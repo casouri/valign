@@ -2,7 +2,7 @@
 
 此包在GUI Emacs下，为Org Mode, Markdown以及table.el的表格提供了对齐效果。其可以正确的对齐包含了可变字体(variable-pitch font)，中日韩(CJK)字符，以及图片的表格。同时，不影响Org Mode(或Markdown mode)的基于文本对齐的方式。
 
-为了使用此包，先加载它其次将 ~valign-mode~ 添加到 ~org-mode-hook~ 或 ~markdown-mode-hook~ 钩子中。
+为了使用此包，先加载，它其次将 ~valign-mode~ 添加到 ~org-mode-hook~ 或 ~markdown-mode-hook~ 钩子中。
 #+begin_src emacs-lisp
 (add-hook 'org-mode-hook #'valign-mode)
 #+end_src
@@ -22,9 +22,9 @@
   渲染大型表格(≥100b行)速度较慢。
   #+end_quote
 - ~org-indent-mode~ plus ~display-line-numbers-mode~ causes alignment problems.
-  #+begin_src 
+  #+begin_quote 
   同时开启 org-indent-mode 和 display-line-numbers-mode 会导致对齐问题。.
-  #+end_src
+  #+end_quote
 
 *注意:*
 
@@ -47,11 +47,8 @@ M-x package-install RET valign RET
 
 默认情况下，valign不会在普通编辑命令，例如 ~self-insert-command~ 和 ~backward-kill-word~ 执行后对表格重新对其。如果你想让某些命令执行后不要重新对其表格可以将其加入 ~valign-not-align-after-list~ 中。
 
-Because valign isn’t particularly efficient, it doesn’t align tables larger than 4000 characters in size. If you want to change that behavior, customize ~valign-max-table-size~. Valign puts ~valign-table-fallback~ face on those large tables.
-
 由于目前valign不是格外的强大，所以其不会对大于4k字符大小的表格对齐。如果你想要改变这个限制，可以修改 ~valign-max-table-size~ 。 Valign会将 ~valign-table-fallback~ face置于大型表格上。
 
 * 如果函数advice让你感到不适
-~valign-mode~ adds advice and doesn’t remove them even if you close ~valign-mode~ because function advice is global and ~valign-mode~ is local. If you want to remove the advice, use ~valign-remove-advice~. If you run this while some buffer still has ~valign-mode~ on, they break.
 
 ~valign-mode~ 添加了advice，即使你关闭了 ~valign-mode~ 也仍然无法删除advice，因为函数advice是全局的，而 ~valign-mode~ 是局部的。 如果你想要删除 advice，请使用 ~valign-remove-advice~ 。 如果你在一些缓冲区(buffer) 仍然开启 ~valign-mode~ ，那么advice仍然存在。
