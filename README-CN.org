@@ -1,0 +1,54 @@
+#+TITLE: Valign.el
+
+此包在GUI Emacs下，为Org Mode, Markdown以及table.el的表格提供了对齐效果。其可以正确的对齐包含了可变字体(variable-pitch font)，中日韩(CJK)字符，以及图片的表格。同时，不影响Org Mode(或Markdown mode)的基于文本对齐的方式。
+
+为了使用此包，先加载，它其次将 ~valign-mode~ 添加到 ~org-mode-hook~ 或 ~markdown-mode-hook~ 钩子中。
+#+begin_src emacs-lisp
+(add-hook 'org-mode-hook #'valign-mode)
+#+end_src
+
+[[./default.png]]
+
+[[./table.el.png]]
+
+*已知的问题:*
+
+- Hidden links in markdown still occupy the full length of the link, because it uses character composition which we don’t support now. 
+  #+begin_quote
+  Markdown的隐藏链接仍然占据了整个链接，因为其使用了我们目前无法支持的字符构成。  
+  #+end_quote
+- Rendering large tables (≥100 lines) is laggy.
+  #+begin_quote
+  渲染大型表格(≥100b行)速度较慢。
+  #+end_quote
+- ~org-indent-mode~ plus ~display-line-numbers-mode~ causes alignment problems.
+  #+begin_quote 
+  同时开启 org-indent-mode 和 display-line-numbers-mode 会导致对齐问题。.
+  #+end_quote
+
+*注意:*
+
+为了使得 valign 能作用于 table.el 的表格，每个单元格的右侧必须有一个空格且左侧必须没有空格。你可以使用 [[https://github.com/casouri/ftable][ftable.el]] 来为表格自动布局。
+
+* 安装
+
+你可以键入如下内容从 GNU ELPA中获取 valign.el:
+#+begin_src 
+M-x package-install RET valign RET
+#+end_src
+
+* 自定义
+
+设置 ~valign-fancy-bar~ 为 非空(non-nil)，效果如下:
+
+[[./fancy-bar.png]]
+
+仅影响 Org Mode和Markdown 的表格。
+
+默认情况下，valign不会在普通编辑命令，例如 ~self-insert-command~ 和 ~backward-kill-word~ 执行后对表格重新对其。如果你想让某些命令执行后不要重新对其表格可以将其加入 ~valign-not-align-after-list~ 中。
+
+由于目前valign不是格外的强大，所以其不会对大于4k字符大小的表格对齐。如果你想要改变这个限制，可以修改 ~valign-max-table-size~ 。 Valign会将 ~valign-table-fallback~ face置于大型表格上。
+
+* 如果函数advice让你感到不适
+
+~valign-mode~ 添加了advice，即使你关闭了 ~valign-mode~ 也仍然无法删除advice，因为函数advice是全局的，而 ~valign-mode~ 是局部的。 如果你想要删除 advice，请使用 ~valign-remove-advice~ 。 如果你在一些缓冲区(buffer) 仍然开启 ~valign-mode~ ，那么advice仍然存在。
