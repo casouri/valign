@@ -16,7 +16,6 @@ To use this package, load it and add ~valign-mode~ to ~org-mode-hook~ or ~markdo
 *Known problems:*
 - Hidden links in markdown still occupy the full length of the link, because it uses character composition which we don’t support now.
 - Rendering large tables (≥100 lines) is laggy.
-- ~org-indent-mode~ plus ~display-line-numbers-mode~ causes alignment problems.
 
 *Note:*
 

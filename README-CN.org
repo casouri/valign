@@ -15,7 +15,6 @@
 
 - Markdown Mode 里的隐藏链接依然会占用整个链接的宽度，因为隐藏链接用了 valign 还不支持的 character composition。
 - 渲染大型表格（≥100行）速度较慢。
-- 同时开启 ~org-indent-mode~ 和 ~display-line-numbers-mode~ 会导致对齐问题。
 
 *注意:*
 
