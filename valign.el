@@ -1046,7 +1046,9 @@ Force align if FORCE non-nil."
 FLAG is the same as in ‘org-flag-region’."
   (when (and valign-mode (not flag))
     (with-silent-modifications
-      (put-text-property beg end 'fontified nil))))
+      ;; Outline has a bug that passes 0 as a buffer position
+      ;; to `org-flag-region', so we need to patch that up.
+      (put-text-property (max 1 beg) end 'fontified nil))))
 
 (defun valign--tab-advice (&rest _)
   "Force realign after tab so user can force realign."
