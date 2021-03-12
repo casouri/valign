@@ -37,6 +37,26 @@
 |---+------------------------------|               |---+--------|
 #+end_example
 
+Unicode table:
+┌─────────────────────────┬─────────────────────────────────────────┐
+│Options                  │Description                              │
+├─────────────────────────┼─────────────────────────────────────────┤
+│~zeft-directory~         │Directory in where notes are stored.     │
+│                         │Must be a full path.                     │
+├─────────────────────────┼─────────────────────────────────────────┤
+│~zeft-find-file-hook~    │Hook run when Zeft opens a file.         │
+├─────────────────────────┼─────────────────────────────────────────┤
+│~zeft-selection~         │Face for the current selected search     │
+│                         │result.                                  │
+├─────────────────────────┼─────────────────────────────────────────┤
+│~zeft-inline-highlight~  │Face for inline highlighting in Zeft     │
+│                         │buffer.                                  │
+├─────────────────────────┼─────────────────────────────────────────┤
+│~zeft-preview-highlight~ │Face for highlighting in the preview     │
+│                         │buffer.                                  │
+└─────────────────────────┴─────────────────────────────────────────┘
+
+
 * Foo
 ** Bar
 *** Baz
