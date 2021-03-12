@@ -483,9 +483,10 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
   (save-excursion
     (beginning-of-line)
     (skip-chars-forward " \t")
-    ;; Org mode table.
+    ;; CHAR is the first character, CHAR 2 is the one after it.
     (let ((char (char-to-string (char-after)))
-          (char2 (char-to-string (or (char-after (1+ (point))) ""))))
+          (char2 (when-let ((char (char-after (1+ (point)))))
+                   (char-to-string char))))
       (or (equal char "|")
           (cl-loop
            for elt in valign-box-charset-alist
