@@ -395,14 +395,13 @@ Return t if the dimension is correct, nil if not."
   "Return t if this line is a separator line.
 If the table is a table.el table, you need to specify CHARSET.
 Assumes the point is at the beginning of the line."
-  (let ((charset (or charset (cdar valign-box-charset-alist))))
-    (and (re-search-forward
-          (rx-to-string `(or ,(valign-box-char 1 charset)
-                             ,(valign-box-char 4 charset)
-                             ,(valign-box-char 7 charset)
-                             ,(valign-box-char 'v charset)))
-          (line-end-position) t)
-         (valign--separator-p))))
+  (if charset
+      (let ((charset (or charset (cdar valign-box-charset-alist))))
+        (member (char-to-string (char-after))
+                (list (valign-box-char 1 charset)
+                      (valign-box-char 4 charset)
+                      (valign-box-char 7 charset))))
+    (valign--separator-p)))
 
 (defun valign--calculate-cell-width (limit &optional charset)
   "Return a list of column widths.
@@ -497,6 +496,12 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
                        (member char2
                                (list (valign-box-char 2 charset)
                                      (valign-box-char 3 charset)
+                                     (valign-box-char 'h charset))))
+                  (and (equal char
+                              (valign-box-char 4 charset))
+                       (member char2
+                               (list (valign-box-char 5 charset)
+                                     (valign-box-char 6 charset)
                                      (valign-box-char 'h charset))))
                   (and (equal char
                               (valign-box-char 7 charset))
@@ -744,7 +749,7 @@ at the end of the table."
                                    'face 'valign-table-fallback))))
         (when go-to-end (valign--end-of-table)))
 
-    ((debug valign-parse-error error)
+    ((valign-parse-error error)
      (valign--clean-text-property
       (save-excursion (valign--beginning-of-table) (point))
       (save-excursion (valign--end-of-table) (point)))
