@@ -188,7 +188,9 @@ Doesn’t check if we are in a cell."
     (if (looking-at " [^ ]")
         'left
       (if (not (search-forward "|" nil t))
-          (signal 'valign-parse-error '("Missing the right bar (|)"))
+          (signal
+           'valign-parse-error
+           (list (format "Missing the right bar (|) around %s" (point))))
         (if (looking-back
              "[^ ] |" (max (- (point) 3) (point-min)))
             'right
@@ -427,7 +429,7 @@ need to specify CHARSET."
           (push (reverse row) matrix))))
     ;; Sanity check.
     (unless (valign---check-dimension matrix)
-      (signal 'valign-parse-error '("Missing rows or columns")))
+      (signal 'valign-parse-error '("The number of columns for each row don’t match, maybe a bar (|) is missing?")))
     (setq matrix (valign--transpose (reverse matrix)))
     ;; Add 8 pixels of padding.
     (mapcar (lambda (col) (+ (apply #'max col) 8)) matrix)))
@@ -447,7 +449,7 @@ TYPE must be 'markdown.  Start at point, stop at LIMIT."
           (push (reverse row) matrix))))
     ;; Sanity check.
     (unless (valign---check-dimension matrix)
-      (signal 'valign-parse-error '("Missing rows or columns")))
+      (signal 'valign-parse-error '("The number of columns for each row don’t match, maybe a bar (|) is missing?")))
     (setq matrix (valign--transpose (reverse matrix)))
     (if matrix
         (mapcar #'car matrix)
@@ -472,7 +474,7 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
           (push (reverse row) matrix)))
       ;; Sanity check.
       (unless (valign---check-dimension matrix)
-        (signal 'valign-parse-error '("Missing rows or columns")))
+        (signal 'valign-parse-error '("The number of columns for each row don’t match, maybe a bar (|) is missing?")))
       (setq matrix (valign--transpose (reverse matrix)))
       ;; For each column, we take the majority.
       (mapcar (lambda (col)
@@ -712,7 +714,8 @@ COLUMN-WIDTH-LIST is returned by `valign--calculate-cell-width'."
   :group 'valign)
 
 (defvar valign-signal-parse-error nil
-  "When non-nil, signal parse error.")
+  "When non-nil and ‘debug-on-error’, signal parse error.
+If ‘debug-on-error’ is also non-nil, drop into the debugger.")
 
 (defcustom valign-max-table-size 4000
   "Valign doesn't align tables of size larger than this value.
@@ -758,11 +761,11 @@ at the end of the table."
      (valign--clean-text-property
       (save-excursion (valign--beginning-of-table) (point))
       (save-excursion (valign--end-of-table) (point)))
-     ;; Ignore parse error when not in debug mode.
-     (if (and (not valign-signal-parse-error)
-              (eq (car err) 'valign-parse-error))
-         nil
-       (signal (car err) (cdr err))))))
+     (when (and (eq (car err) 'valign-parse-error)
+                valign-signal-parse-error)
+       (if debug-on-error
+           (debug 'valign-parse-error)
+         (message "%s" (error-message-string err)))))))
 
 (defun valign-table-1 ()
   "Visually align the table at point."
@@ -782,7 +785,9 @@ at the end of the table."
     ;; Align each row.
     (valign--do-row row-idx table-end
       (unless (search-forward "|" (line-end-position) t)
-        (signal 'valign-parse-error '("Missing the right bar (|)")))
+        (signal 'valign-parse-error
+                (list (format "Missing the right bar (|) around %s"
+                              (point)))))
       (if (valign--separator-p)
           ;; Separator row.
           (valign--align-separator-row column-width-list)
