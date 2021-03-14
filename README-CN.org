@@ -39,6 +39,11 @@ M-x package-install RET valign RET
 
 因为 valign 性能一般，所以我们不会对齐大于四千个字的表格。你可以修改 ~valign-max-table-size~ 改变这个限制。valign 会把 ~valign-table-fallback~ face 置于这些没有对齐的表格上。
 
+其他自定义选项：
+- ~valign-signal-parse-error~: 设为 non-nil，valign 遇到语法分析错误（parse error）时会报错提示。
+- ~valign-lighter~: mode-line 里显示的标识。
+- ~valign-box-charset-alist~: 用来定义 table.el 表格，比如 Unicode/ASCII 表格.
+
 * 如果函数 advice 让你浑身发痒
 
 ~valign-mode~ 会加一些 advice，即使你关闭了 ~valign-mode~​，这些 advice 也不会消失 ，因为函数advice是全局起效，而 ~valign-mode~ 是局部起效。 如果你想删掉这些 advice，请用 ~valign-remove-advice~ 。 这时候如果有 buffer 里还开着 ~valign-mode~​，这些 buffer 里的 valign 将无法正常工作。
