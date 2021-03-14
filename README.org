@@ -39,5 +39,10 @@ By default, valign doesn’t re-align the table after normal edit commands like 
 
 Because valign isn’t particularly efficient, it doesn’t align tables larger than 4000 characters in size. If you want to change that behavior, customize ~valign-max-table-size~. Valign puts ~valign-table-fallback~ face on those large tables.
 
+Other (less interesting) customization:
+- ~valign-signal-parse-error~: Set to non-nil to be informed of parse errors.
+- ~valign-lighter~: Lighter in mode-line.
+- ~valign-box-charset-alist~: Used for defining table.el tables, e.g., Unicode/ASCII tables.
+
 * If function advice makes you itch
 ~valign-mode~ adds advice and doesn’t remove them even if you close ~valign-mode~ because function advice is global and ~valign-mode~ is local. If you want to remove the advice, use ~valign-remove-advice~. If you run this while some buffer still has ~valign-mode~ on, they break.
