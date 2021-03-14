@@ -324,11 +324,11 @@ properties must be cleaned before using this."
   (- (car (window-text-pixel-size nil (line-beginning-position) point))
      (line-number-display-width 'pixel)))
 
-(defun valign--separator-p ()
+(defun valign--separator-p (&optional point)
   "If the current cell is actually a separator.
-Assume point is after the left bar (“|”)."
-  (or (eq (char-after) ?:) ;; Markdown tables.
-      (eq (char-after) ?-)))
+POINT should be after the left bar (“|”), default to current point."
+  (or (eq (char-after point) ?:) ;; Markdown tables.
+      (eq (char-after point) ?-)))
 
 (defun valign--alignment-from-seperator ()
   "Return the alignment of this column.
@@ -394,22 +394,27 @@ Return t if the dimension is correct, nil if not."
 (defun valign--separator-line-p (&optional charset)
   "Return t if this line is a separator line.
 If the table is a table.el table, you need to specify CHARSET.
+If the table is not a table.el table, DON’T specify CHARSET.
 Assumes the point is at the beginning of the line."
-  (if charset
-      (let ((charset (or charset (cdar valign-box-charset-alist))))
-        (member (char-to-string (char-after))
-                (list (valign-box-char 1 charset)
-                      (valign-box-char 4 charset)
-                      (valign-box-char 7 charset))))
-    (valign--separator-p)))
+  (save-excursion
+    (skip-chars-forward " \t")
+    (if charset
+        ;; Check for table.el tables.
+        (let ((charset (or charset (cdar valign-box-charset-alist))))
+          (member (char-to-string (char-after))
+                  (list (valign-box-char 1 charset)
+                        (valign-box-char 4 charset)
+                        (valign-box-char 7 charset))))
+      ;; Check for org/markdown tables.
+      (and (eq (char-after) ?|)
+           (valign--separator-p (1+ (point)))))))
 
 (defun valign--calculate-cell-width (limit &optional charset)
   "Return a list of column widths.
 Each column width is the largest cell width of the column.  Start
 from point, stop at LIMIT.  If the table is a table.el table, you
 need to specify CHARSET."
-  (let* ((charset (or charset (cdar valign-box-charset-alist)))
-         (bar-char (valign-box-char 'v charset))
+  (let* ((bar-char (if charset (valign-box-char 'v charset) "|"))
          row-idx column-idx matrix row)
     (ignore row-idx)
     (save-excursion
