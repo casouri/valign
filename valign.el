@@ -107,9 +107,7 @@
 (require 'cl-lib)
 (require 'pcase)
 
-(defgroup valign
-  '((valign-lighter custom-variable)
-    (valign-fancy-bar custom-variable))
+(defgroup valign nil
   "Visually align text tables on GUI."
   :group 'text)
 
