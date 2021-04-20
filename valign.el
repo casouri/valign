@@ -391,6 +391,14 @@ Return t if the dimension is correct, nil if not."
              return nil
              finally return t)))
 
+(defsubst valign--char-after-as-string (&optional pos)
+  "Return (char-after POS) as a string."
+  ;; (char-to-string (char-after)) doesn’t work because
+  ;; ‘char-to-string’ doesn’t accept nil.b
+  (if-let ((ch (char-after pos)))
+      (char-to-string ch)
+    nil))
+
 (defun valign--separator-line-p (&optional charset)
   "Return t if this line is a separator line.
 If the table is a table.el table, you need to specify CHARSET.
@@ -401,7 +409,7 @@ Assumes the point is at the beginning of the line."
     (if charset
         ;; Check for table.el tables.
         (let ((charset (or charset (cdar valign-box-charset-alist))))
-          (member (char-to-string (char-after))
+          (member (valign--char-after-as-string)
                   (list (valign-box-char 1 charset)
                         (valign-box-char 4 charset)
                         (valign-box-char 7 charset))))
@@ -488,9 +496,8 @@ TYPE must be 'org.  Start at point, stop at LIMIT."
     (beginning-of-line)
     (skip-chars-forward " \t")
     ;; CHAR is the first character, CHAR 2 is the one after it.
-    (let ((char (char-to-string (char-after)))
-          (char2 (when-let ((char (char-after (1+ (point)))))
-                   (char-to-string char))))
+    (let ((char (valign--char-after-as-string))
+          (char2 (valign--char-after-as-string (1+ (point)))))
       (or (equal char "|")
           (cl-loop
            for elt in valign-box-charset-alist
@@ -910,7 +917,7 @@ Assumes point is at (2).
     (while (< (point) table-end)
       (save-excursion
         (skip-chars-forward " \t")
-        (if (not (equal (char-to-string (char-after))
+        (if (not (equal (valign--char-after-as-string)
                         (valign-box-char 'v charset)))
             ;; Render separator line.
             (valign--align-separator-row-full
@@ -1003,7 +1010,7 @@ Assumes point before the first character."
 Assumes point at the beginning of the table."
   (cl-loop for charset
            in (mapcar #'cdr valign-box-charset-alist)
-           if (equal (char-to-string (char-after))
+           if (equal (valign--char-after-as-string)
                      (valign-box-char 1 charset))
            return charset
            finally return nil))
