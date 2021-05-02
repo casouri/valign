@@ -394,10 +394,10 @@ Return t if the dimension is correct, nil if not."
 (defsubst valign--char-after-as-string (&optional pos)
   "Return (char-after POS) as a string."
   ;; (char-to-string (char-after)) doesn’t work because
-  ;; ‘char-to-string’ doesn’t accept nil.b
-  (if-let ((ch (char-after pos)))
-      (char-to-string ch)
-    nil))
+  ;; ‘char-to-string’ doesn’t accept nil. ‘if-let’ has some problems
+  ;; so I replaced it with ‘let’ and ‘if’ (See Bug #25 on GitHub).
+  (let ((ch (char-after pos)))
+    (if ch (char-to-string ch))))
 
 (defun valign--separator-line-p (&optional charset)
   "Return t if this line is a separator line.
