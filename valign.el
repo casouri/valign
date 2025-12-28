@@ -1110,6 +1110,28 @@ This runs in `kill-buffer-hook'."
                (buffer-list)))
     (valign-remove-advice)))
 
+;; When a Org file starts out folded, valign won’t get a chance to
+;; align everything at start up. Then when the section is expanded,
+;; the tables aren’t aligned properly. This function will run when org
+;; header cycles, and force a refontification of the section. We
+;; really only need it the first time, and if the section is huge,
+;; this might cause some lag, but valign is pretty bad at large Org
+;; files anyway. One way to improve this is to add a new text property
+;; like valign-initialized, and only refontify parts that aren’t
+;; marked with this property. That could be a TODO.
+(defun valign--org-cycle-refontify (state)
+  "Refontify the visible part affected by `org-cycle`.
+STATE is a symbol indicating the new visibility state."
+  (when (bound-and-true-p valign-mode)
+    (pcase state
+      ('children (let ((start (point))
+		               (end (save-excursion (outline-next-heading) (point))))
+		           (jit-lock-refontify start end)))
+      ('subtree (let ((start (point))
+		              (end (save-excursion (org-end-of-subtree t t))))
+		          (jit-lock-refontify start end)))
+      ('all (jit-lock-refontify (point-min) (point-max))))))
+
 ;;; Userland
 
 ;;;###autoload
@@ -1129,7 +1151,8 @@ This runs in `kill-buffer-hook'."
         (message "Valign mode has no effect in non-graphical display"))
     (if valign-mode
         (progn
-          (add-hook 'jit-lock-functions #'valign-region 98 t)
+          (add-hook 'jit-lock-functions #'valign-region 80 t)
+          (add-hook 'org-cycle-hook #'valign--org-cycle-refontify 80 t)
           (dolist (fn '(org-cycle
                         ;; Why this function?  If you tab into an org
                         ;; field (cell) and start typing right away,
@@ -1155,6 +1178,7 @@ This runs in `kill-buffer-hook'."
           (if valign-fancy-bar (cursor-sensor-mode))
           (jit-lock-refontify))
       (remove-hook 'jit-lock-functions #'valign-region t)
+      (remove-hook 'org-cycle-hook #'valign--org-cycle-refontify t)
       (remove-hook 'kill-buffer-hook #'valign--maybe-clean-advice t)
       (valign-reset-buffer)
       (cursor-sensor-mode -1)
