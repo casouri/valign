@@ -899,11 +899,8 @@ Assumes point is at (2).
          (_ (valign--clean-text-property table-beg table-end))
          ;; Measure char width after cleaning text properties.
          ;; Otherwise the measurement is not accurate.
-         (char-width (with-silent-modifications
-                       (insert (valign-box-char 'h ucharset))
-                       (prog1 (valign--pixel-width-from-to
-                               (1- (point)) (point))
-                         (backward-delete-char 1))))
+         (char-width (string-pixel-width
+                      (valign-box-char 'h ucharset)))
          (column-width-list
           ;; Make every width multiples of CHAR-WIDTH.
           (mapcar (lambda (x)
