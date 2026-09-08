@@ -326,15 +326,23 @@ properties must be cleaned before using this."
 
 (defun valign--separator-p (&optional point)
   "If the current cell is actually a separator.
-POINT should be after the left bar (“|”), default to current point."
-  (or (eq (char-after point) ?:) ;; Markdown tables.
-      (eq (char-after point) ?-)))
+POINT should be after the left bar (“|”), default to current point.
+Allow horizontal whitespace around Markdown separators."
+  (if (eq (valign--guess-table-type) 'markdown)
+      (save-excursion
+        (when point (goto-char point))
+        ;; Check the whole cell so that negative numbers and text starting
+        ;; with a colon are not mistaken for Markdown separators.
+        (looking-at-p "[ \t]*:?-+:?[ \t]*[|+]"))
+    (or (eq (char-after point) ?:)
+        (eq (char-after point) ?-))))
 
 (defun valign--alignment-from-seperator ()
   "Return the alignment of this column.
 Assumes point is after the left bar (“|”) of a separator
 cell.  We don’t distinguish between left and center aligned."
   (save-excursion
+    (skip-chars-forward " \t")
     (if (eq (char-after) ?:)
         'left
       (skip-chars-forward "-")
@@ -663,13 +671,27 @@ Assumes point is on the right bar or plus sign."
       (let ((ov (make-overlay end (1+ end))))
         (overlay-put ov 'display "|")
         (overlay-put ov 'valign t))))
-  ;; Markdown row
-  (when (eq (char-after beg) ?:)
-    (setq beg (1+ beg)))
-  (when (eq (char-before end) ?:)
-    (setq end (1- end)
-          right-pos (- right-pos
-                       (valign--pixel-width-from-to (1- end) end))))
+  ;; Keep Markdown alignment markers visible, including when there is
+  ;; whitespace between the markers and the bars.
+  (if (eq (valign--guess-table-type) 'markdown)
+      (save-excursion
+        (goto-char beg)
+        (skip-chars-forward " \t" end)
+        (when (eq (char-after) ?:)
+          (setq beg (1+ (point))))
+        (goto-char end)
+        (skip-chars-backward " \t" beg)
+        (when (eq (char-before) ?:)
+          (let ((colon (1- (point))))
+            (setq right-pos (- right-pos
+                               (valign--pixel-width-from-to colon end))
+                  end colon))))
+    (when (eq (char-after beg) ?:)
+      (setq beg (1+ beg)))
+    (when (eq (char-before end) ?:)
+      (setq end (1- end)
+            right-pos (- right-pos
+                         (valign--pixel-width-from-to (1- end) end)))))
   ;; End of Markdown
   (valign--put-overlay beg end
                        'display (valign--space right-pos)
