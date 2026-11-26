@@ -813,7 +813,9 @@ at the end of the table."
                    ;; left or right aligned.
                    (alignment (nth column-idx column-alignment-list))
                    ;; Pixel width of the cell.
-                   (cell-width (valign--cell-content-width)))
+                   (cell-width (if (eq alignment 'right)
+                                   (valign--cell-content-width)
+                                 0)))
               ;; Align cell.
               (pcase-let ((`(,cell-beg ,content-beg
                                        ,content-end ,cell-end)
